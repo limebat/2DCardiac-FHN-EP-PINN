@@ -1,0 +1,66 @@
+% FitzHugh-Nagumo model in 2D 
+
+% parameter values
+a=0.1;
+gamma=1;
+beta=0.5;
+eps=0.01;
+delta=0.;
+
+% numerical parameters
+dx=0.5;
+dt=0.1;
+diff = 0.5;   % diffusion coefficient
+endtime=2000;   % length of simulation in physical time units
+nend=ceil(endtime/dt); % length of simulation in time steps
+outputevery=5;  % save u variable for display every this many time units
+iout = round(outputevery/dt); % output interval in time steps
+nout=ceil(endtime/outputevery); % number of times to output
+kout=1; % index for output
+nx = 201; % 2d square length in gridpoints; physical length is nx * dx
+
+% initial values
+u=zeros(nx,nx); % fast "voltage"-like variable
+v=zeros(nx,nx); % slow recovery variable
+
+% target pattern ICs
+% u(ceil(nx/2)-5:ceil(nx/2)+5,ceil(nx/2)-5:ceil(nx/2)+5)=0.5;
+% v(ceil(nx/2)-5:ceil(nx/2)+5,ceil(nx/2)-5:ceil(nx/2)+5)=0.25;
+
+% spiral wave ICs
+v(1:ceil(nx/2),ceil(nx/2):nx)=0.3;
+u(1:ceil(nx/2),1:ceil(nx/2))=0.5;
+
+% plane wave ICs
+% u(:,1:10)=0.5;
+
+% set up matrix for diffusion + no-flux boundary conditions
+I=speye(nx,nx);			% diagonal elements, 1D
+E=sparse(2:nx,1:nx-1,1,nx,nx);	% superdiagonal elements, 1D
+D=E+E'-2*I;			% tridiagonal matrix for 1D
+D(1,2)=2;			% set no-flux boundary conditions, 1D
+D(nx,nx-1)=2;			% set no-flux boundary conditions, 1D
+A=kron(D,I)+kron(I,D);		% kron(I,D) is block-diagonal with D along diag; kron(D,I) "spreads out" D to take care of y-diffusion
+A=A*diff*dt/(dx*dx);		% scale A by diffusion coeff, dt, and dx^2
+
+xx=(0:nx-1)*dx;
+
+for ntime=1:nend
+
+    du=(a-u).*(u-1).*u-v;	% original function for FHN model: will hyperpolarize
+%    du=(a-u).*(u-1).*u-u.*v;	% modified function that avoids hyperpolarization
+    dv=eps*(beta*u-gamma*v-delta);	% update for v; nonzero delta is one way to get auto-oscillatory behavior
+    
+    ulap=reshape(A*reshape(u,nx*nx,1),nx,nx); % Laplacian (diffusion) term: multiply giant matrix A by "1D" arrangement of u
+
+    u = u + ulap + dt*du;	% forward Euler update of u
+    v = v + dt*dv;		% forward Euler update of v
+
+    if(mod(ntime,iout)==0)
+        pcolor(xx,xx,u),shading interp,daspect([1 1 1])
+        caxis([-0.3 1]),colormap(copper),colorbar 	% use this color axis when there is hyperpolarization to account for u<0
+%        caxis([0 1]),colormap(copper),colorbar		% use this color axis when avoiding hyperpolarization
+        title(['Time = ' num2str(ntime*dt)]),drawnow
+    end
+
+end
