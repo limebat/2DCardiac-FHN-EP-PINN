@@ -319,6 +319,56 @@ def plot_transient_2d(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch
         plt.show()
 
 
+# TODO Unfinished
+# Create plots to analyze the convergence of our residuals.
+def plot_residuals(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch_max, times):
+    x = torch.linspace(0, x_end, nx)
+    y = torch.linspace(0, y_end, ny)
+    x_mesh, y_mesh = torch.meshgrid(x, y)
+    
+    # Train a model based on every time step, given parameters of model and input residual / IC tensors
+    model = loss(model, x_ic, x_res, N_analytical, epoch_max, times)
+
+    for time in time_steps:
+        # Prepare input grid with current time for the model prediction
+        xy = torch.stack([x_mesh.flatten(), y_mesh.flatten(), time * torch.ones_like(x_mesh.flatten())], dim=1)
+        print('Input is of dimensions: ', np.size(xy), 'Value of : ', xy)
+       
+        u_pred, v_pred = model(xy)
+        u_pred = u_pred.detach().numpy().reshape(nx, ny)
+        v_pred = v_pred.detach().numpy().reshape(nx, ny)
+        
+        # Get analytical solution for u at the given time
+        u_analytical, v_analytical = analytical_solution(xy, time)
+        u_analytical = u_analytical.detach().numpy().reshape(nx, ny)
+        v_analytical = v_analytical.detach().numpy().reshape(nx, ny)
+        abs_u_residual = np.absolute(u_analytical - u_pred)
+        abs_v_residual = np.absolute(v_analytical - v_pred)
+        
+        # Create figure to compare u_pred and u_analytical
+        fig, (ax_abs_u_residual, ax_abs_v_residual) = plt.subplots(1, 2, figsize=(12, 6))
+        
+        # Plot u residual
+        norm_u = plt.Normalize(vmin=abs_u_residual.min(), vmax=abs_u_residual.max())
+        im_u_pred = ax_abs_u_residual.imshow(abs_u_residual, cmap='viridis', norm=norm_u, origin='lower', extent=[0, 1, 0, 1])
+        ax_abs_u_residual.set_title(f'Abs(u residual) at t = {time:.2f}')
+        ax_abs_u_residual.set_xlabel('x')
+        ax_abs_u_residual.set_ylabel('y')
+        fig.colorbar(im_u_pred, ax=ax_abs_u_residual)
+
+        # Plot v residual
+        norm_v = plt.Normalize(vmin=abs_v_residual.min(), vmax=abs_v_residual.max())
+        im_u_analytical = ax_abs_v_residual.imshow(abs_v_residual, cmap='plasma', norm=norm_v, origin='lower', extent=[0, 1, 0, 1])
+        ax_abs_v_residual.set_title(f'Abs(v residual) at t = {time:.2f}')
+        ax_abs_v_residual.set_xlabel('x')
+        ax_abs_v_residual.set_ylabel('y')
+        fig.colorbar(im_u_analytical, ax=ax_abs_v_residual)
+
+        # Show each comparison figure separately
+        plt.tight_layout()
+        plt.show()
+
 # Our main code block
 model = PINN(NeuronCount)
 plot_transient_2d(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch_max, times)
+# plot_residuals(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch_max, times)
