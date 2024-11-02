@@ -36,7 +36,7 @@ v_ic = 0.5 * torch.ones((int(N_ic), int(N_ic)), dtype=torch.float32).flatten()
 u_ic = torch.zeros_like(v_ic)
 
 # Function to return initial x / y / t values separately for ICs and residuals so they don't have to be the same. Create grid over x, y with t=0.
-def return_x_tensor(x, y, N, is_IC):
+def return_x_tensor(N, is_IC):
     # Values for residuals so they don't have to be the same as those for ICs: grid over x, y with t=0
     x_vals = torch.linspace(0, x_end, N)
     y_vals = torch.linspace(0, y_end, N)
@@ -58,8 +58,8 @@ def return_x_tensor(x, y, N, is_IC):
     
     return x_tensor
 
-x_ic = return_x_tensor(x_end, y_end, N_ic, is_IC=True)
-x_res = return_x_tensor(x_end, y_end, N_res, is_IC=False)
+x_ic = return_x_tensor(N_ic, is_IC=True)
+x_res = return_x_tensor(N_res, is_IC=False)
 
 
 class PINN(nn.Module):
@@ -168,7 +168,6 @@ def analytical_solution(input, input_time):
     return sampled_u, sampled_v
 
 
-# TODO x_ic_tensor 100x100 when it should be 250x250?
 def IC_loss(model, x_ic_tensor):
     '''
     The first of our PINN's 3 loss functions, based on the difference between the true and predicted initial conditions.
@@ -199,7 +198,6 @@ def residual_loss(model, x_res_tensor):
     return loss_residual_u + loss_residual_v
 
 
-# TODO The total loss hits ~0.6 at its lowest, after which PDE_loss starts to rebound and grow continuously. Why is this happening?
 # The third of our PINN's 3 loss functions, based on the difference between the true and predicted analytical u and v values.
 def PDE_loss(model, N_analytical, times):
     total_loss_PDE = 0
