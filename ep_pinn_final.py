@@ -152,14 +152,8 @@ def analytical_solution(input, input_time):
     total_points = nx * ny
     time_column = data[:, 0]
     
-    print(f'The input time is {input_time}')
-    
     # Find the index corresponding to input_time
     time_index = np.where(time_column == input_time)[0]
-    
-    print(f'The time column is {time_column}')
-    
-    print(f'time_index access is {time_index}')
     
     index = time_index
     u_flattened = data[index, 1:total_points+1] # The first half of data contains u values -- +1 to skip time-index at first element
