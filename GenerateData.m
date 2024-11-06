@@ -19,14 +19,14 @@ v_gate=0.13; %0.13 %0.35 gives oscillatory
 v_stim=0.056; %twice diastolic threshold for 2ms duration
 
 % numerical and stimulation parameters
-dt = 0.2;
-endtime = 300;
+dt = 0.25;
+endtime = 2000;
 nsteps = ceil(endtime/dt);
 stimdur= 2;
 nstimdur = ceil(stimdur/dt);
-spiraltime=10;
+spiraltime=250;
 nspiraltime=ceil(spiraltime/dt);
-dx=0.2;
+dx=0.05;
 diff=0.001; % diffusion coefficient
 nx=250;
 ny=nx;
@@ -55,7 +55,7 @@ fprintf(fileID, '\n'); % Move to the next line
 % arrays for saving data
 vsave=zeros(nsteps,nx,ny);
 hsave=zeros(nsteps,nx,ny);
-t = dt:dt:endtime;
+t = 0:dt:endtime;
 xx=1:nx;
 xx=xx*dx;
 
