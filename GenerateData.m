@@ -5,7 +5,7 @@ clf
 % Mitchell-Schaeffer model in 2d
 % from 2003 Bulletin of Mathematical Biology
 
-% parameter values
+% parameter values 
 tau_in=0.3;
 tau_out=6;
 % original value; decreasing tau_open promotes breakup
@@ -20,7 +20,7 @@ v_stim=0.056; %twice diastolic threshold for 2ms duration
 
 % numerical and stimulation parameters
 dt = 0.2;
-endtime = 1;
+endtime = 300;
 nsteps = ceil(endtime/dt);
 stimdur= 2;
 nstimdur = ceil(stimdur/dt);
@@ -35,7 +35,7 @@ dt_o_dx2=dt/(dx*dx);
 
 % initial values for state variables
 v = 0*ones(nx,ny); %0
-h = 0.5*ones(nx,ny);
+h = 0.5*ones(nx,ny); 
 
 fileID = fopen('TimeVH.txt', 'w');
 fileIDMESH = fopen('XY.txt', 'w');
@@ -121,7 +121,7 @@ for ntime=1:nsteps
 %    v = v + dt*dv + diff*dt_o_dx2*xlap;
     v = v + dt*dv + xlap;
     h = h + dt*dh;
-    if(mod(ntime,200)==1) %test
+    if(mod(ntime,200)==0)
         pcolor(v),shading interp,daspect([1 1 1]),caxis([0 1]),colorbar,title(["time = " num2str(ntime*dt)]),drawnow
 
         % Save state variables
