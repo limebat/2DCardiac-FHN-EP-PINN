@@ -10,7 +10,7 @@ import time
 import pandas as pd
 
 # Constants and other initializations
-a = 0.1         # The model parameters for FHN
+a = 0.2         # The model parameters for FHN
 beta = 0.5      # -
 gamma = 1       # -
 delta = 0.0     # -
