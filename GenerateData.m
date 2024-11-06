@@ -19,8 +19,8 @@ v_gate=0.13; %0.13 %0.35 gives oscillatory
 v_stim=0.056; %twice diastolic threshold for 2ms duration
 
 % numerical and stimulation parameters
-dt = 0.25;
-endtime = 2000;
+dt = 0.05;
+endtime = 50;
 nsteps = ceil(endtime/dt);
 stimdur= 2;
 nstimdur = ceil(stimdur/dt);
@@ -53,8 +53,8 @@ end
 fprintf(fileID, '\n'); % Move to the next line
 
 % arrays for saving data
-vsave=zeros(nsteps,nx,ny);
-hsave=zeros(nsteps,nx,ny);
+% vsave=zeros(nsteps,nx,ny);
+% hsave=zeros(nsteps,nx,ny);
 t = 0:dt:endtime;
 xx=1:nx;
 xx=xx*dx;
@@ -125,8 +125,8 @@ for ntime=1:nsteps
         pcolor(v),shading interp,daspect([1 1 1]),caxis([0 1]),colorbar,title(["time = " num2str(ntime*dt)]),drawnow
 
         % Save state variables
-        vsave(ntime, :, :) = v; 
-        hsave(ntime, :, :) = h; 
+        % vsave(ntime, :, :) = v; 
+        % hsave(ntime, :, :) = h; 
         
         % Flatten and save to file
         v_flatten = v(:)';

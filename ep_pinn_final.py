@@ -10,14 +10,14 @@ import time
 import pandas as pd
 
 # Constants and other initializations
-a = 0.2         # The model parameters for FHN
+a = 0.1         # The model parameters for FHN
 beta = 0.5      # -
 gamma = 1       # -
 delta = 0.0     # -
 eps = 0.01      # -
 dx = 0.2        # -
-dt = 40        # -
-end_time = 280
+dt = 10        # -
+end_time = 50
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = 250   # Number of spatial points in x and y directions
 NeuronCount = [3, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
@@ -159,6 +159,12 @@ def analytical_solution(input, input_time):
     u_flattened = data[index, 1:total_points+1] # The first half of data contains u values -- +1 to skip time-index at first element
     v_flattened = data[index, total_points+1:]  # And the second half contains v values
     
+    # print("u_flattened.shape: ", u_flattened.shape)
+    # print("v_flattened.shape: ", v_flattened.shape)
+
+    # print("u_flattened: ", u_flattened)
+    # print("v_flattened: ", v_flattened)
+
     u_reshaped = u_flattened.reshape(nx, ny)
     v_reshaped = v_flattened.reshape(nx, ny)
     
