@@ -16,16 +16,19 @@ gamma = 1       # -
 delta = 0.0     # -
 eps = 0.01      # -
 dx = 0.2        # -
-dt = 0.2        # -
+dt = 40        # -
+end_time = 280
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = 250   # Number of spatial points in x and y directions
 NeuronCount = [3, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
 N_ic, N_res, N_analytical = 10**2, 10**2, 10**2  # Number of initial conditions, residual points, and analytical points
 epoch_max = int(1e4)  # Number of epochs
 
-times = torch.arange(dt, 1+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
+times = torch.arange(0, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
 
-time_steps = [0, 0.2, 0.4, 0.6, 0.8, 1.0]  # Used as grid spacing in plot_transient_2d
+print(times)
+
+#times = [0, 40, 80, 120, 160, 200, 240, 280]  # Used as grid spacing in plot_transient_2d
 
 #u_initial = np.zeros((nx, ny), dtype=np.float32)  # u = 0
 #v_initial = np.full((nx, ny), 0.5, dtype=np.float32)  # v = 0.5
@@ -149,8 +152,14 @@ def analytical_solution(input, input_time):
     total_points = nx * ny
     time_column = data[:, 0]
     
+    print(f'The input time is {input_time}')
+    
     # Find the index corresponding to input_time
-    time_index = np.where(np.isclose(time_column, input_time, atol=1e-5))[0]
+    time_index = np.where(time_column == input_time)[0]
+    
+    print(f'The time column is {time_column}')
+    
+    print(f'time_index access is {time_index}')
     
     index = time_index
     u_flattened = data[index, 1:total_points+1] # The first half of data contains u values -- +1 to skip time-index at first element
@@ -276,7 +285,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-1):
 
 # TODO Look at v_pred + v_analytical, too
 # Create plots to compare our analytical and predicted solutions for u/v over x and y.
-def plot_transient_2d(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch_max, times):
+def plot_transient_2d(model, times, N_res, x_ic, x_res, N_analytical, epoch_max):
     x = torch.linspace(0, x_end, nx)
     y = torch.linspace(0, y_end, ny)
     x_mesh, y_mesh = torch.meshgrid(x, y)
@@ -284,7 +293,7 @@ def plot_transient_2d(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch
     # Train a model based on every time step, given parameters of model and input residual / IC tensors
     model = loss(model, x_ic, x_res, N_analytical, epoch_max, times)
 
-    for time in time_steps:
+    for time in times:
         # Prepare input grid with current time for the model prediction
         xy = torch.stack([x_mesh.flatten(), y_mesh.flatten(), time * torch.ones_like(x_mesh.flatten())], dim=1)
        
@@ -321,7 +330,7 @@ def plot_transient_2d(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch
 
 # TODO Unfinished
 # Create plots to analyze the convergence of our residuals.
-def plot_residuals(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch_max, times):
+def plot_residuals(model, times, N_res, x_ic, x_res, N_analytical, epoch_max):
     x = torch.linspace(0, x_end, nx)
     y = torch.linspace(0, y_end, ny)
     x_mesh, y_mesh = torch.meshgrid(x, y)
@@ -329,7 +338,7 @@ def plot_residuals(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch_ma
     # Train a model based on every time step, given parameters of model and input residual / IC tensors
     model = loss(model, x_ic, x_res, N_analytical, epoch_max, times)
 
-    for time in time_steps:
+    for time in times:
         # Prepare input grid with current time for the model prediction
         xy = torch.stack([x_mesh.flatten(), y_mesh.flatten(), time * torch.ones_like(x_mesh.flatten())], dim=1)
         print('Input is of dimensions: ', np.size(xy), 'Value of : ', xy)
@@ -370,5 +379,5 @@ def plot_residuals(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch_ma
 
 # Our main code block
 model = PINN(NeuronCount)
-plot_transient_2d(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch_max, times)
-# plot_residuals(model, time_steps, N_res, x_ic, x_res, N_analytical, epoch_max, times)
+plot_transient_2d(model, times, N_res, x_ic, x_res, N_analytical, epoch_max)
+# plot_residuals(model, times, N_res, x_ic, x_res, N_analytical, epoch_max, times)
