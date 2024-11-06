@@ -121,24 +121,24 @@ for ntime=1:nsteps
 %    v = v + dt*dv + diff*dt_o_dx2*xlap;
     v = v + dt*dv + xlap;
     h = h + dt*dh;
-
-    % Save state variables
-    vsave(ntime, :, :) = v; 
-    hsave(ntime, :, :) = h; 
-    
-    % Flatten and save to file
-    v_flatten = v(:)';
-    h_flatten = h(:)';
-    data_row = [ntime*dt, v_flatten, h_flatten];
-    % Print the data row without an extra comma at the end
-    fprintf(fileID, '%g', data_row(1)); % Print the first value without a leading comma
-    for j = 2:length(data_row)
-        fprintf(fileID, ', %g', data_row(j)); % Print subsequent values with a leading comma
-    end
-    fprintf(fileID, '\n'); % Move to the next line
-        
     if(mod(ntime,200)==1)
         pcolor(v),shading interp,daspect([1 1 1]),caxis([0 1]),colorbar,title(["time = " num2str(ntime*dt)]),drawnow
+
+        % Save state variables
+        vsave(ntime, :, :) = v; 
+        hsave(ntime, :, :) = h; 
+        
+        % Flatten and save to file
+        v_flatten = v(:)';
+        h_flatten = h(:)';
+        data_row = [ntime*dt, v_flatten, h_flatten];
+        % Print the data row without an extra comma at the end
+        fprintf(fileID, '%g', data_row(1)); % Print the first value without a leading comma
+        for j = 2:length(data_row)
+            fprintf(fileID, ', %g', data_row(j)); % Print subsequent values with a leading comma
+        end
+        fprintf(fileID, '\n'); % Move to the next line
+            
     end
 end
 
