@@ -20,7 +20,7 @@ dt = 0.2        # -
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = 250   # Number of spatial points in x and y directions
 NeuronCount = [3, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
-N_ic, N_res, N_analytical = nx, 10**2, 10**2  # Number of initial conditions, residual points, and analytical points
+N_ic, N_res, N_analytical = 10**2, 10**2, 10**2  # Number of initial conditions, residual points, and analytical points
 epoch_max = int(1e4)  # Number of epochs
 
 times = torch.arange(dt, 1+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
