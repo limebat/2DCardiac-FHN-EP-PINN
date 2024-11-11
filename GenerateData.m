@@ -19,8 +19,8 @@ v_gate=0.13; %0.13 %0.35 gives oscillatory
 v_stim=0.056; %twice diastolic threshold for 2ms duration
 
 % numerical and stimulation parameters
-dt = 0.05;
-endtime = 50;
+dt = 0.25;
+endtime = 360;
 nsteps = ceil(endtime/dt);
 stimdur= 2;
 nstimdur = ceil(stimdur/dt);
@@ -52,9 +52,7 @@ for j = 2:length(data_row_0)
 end
 fprintf(fileID, '\n'); % Move to the next line
 
-% arrays for saving data
-% vsave=zeros(nsteps,nx,ny);
-% hsave=zeros(nsteps,nx,ny);
+
 t = 0:dt:endtime;
 xx=1:nx;
 xx=xx*dx;
@@ -121,12 +119,10 @@ for ntime=1:nsteps
 %    v = v + dt*dv + diff*dt_o_dx2*xlap;
     v = v + dt*dv + xlap;
     h = h + dt*dh;
-    if(mod(ntime,200)==0)
+    if mod(ntime*dt, 10) == 0
         pcolor(v),shading interp,daspect([1 1 1]),caxis([0 1]),colorbar,title(["time = " num2str(ntime*dt)]),drawnow
 
         % Save state variables
-        % vsave(ntime, :, :) = v; 
-        % hsave(ntime, :, :) = h; 
         
         % Flatten and save to file
         v_flatten = v(:)';
@@ -152,7 +148,7 @@ fprintf(fileIDMESH, '\n');
 fclose(fileID);
 fclose(fileIDMESH);
 
-disp('Data saved to combined_output.csv');
+disp('Data saved to TimeVH.txt');
 
 %colormap gray
 %subplot(2,1,1)

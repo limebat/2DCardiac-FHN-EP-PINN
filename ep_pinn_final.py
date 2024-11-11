@@ -87,6 +87,34 @@ class PINN(nn.Module):
         return u, v  # Return two outputs: u and v
 
 
+
+# input_time should be 250 if wanting to observe the spiral reults
+def load_initial_conditions(input_time):
+    file_path = 'TimeVH.txt'
+    data = np.loadtxt(file_path, delimiter=',', skiprows=1)
+    
+    total_points = nx * ny
+    time_column = data[:, 0]
+    
+    # Locate the row where time equals 250
+    time_index = np.where(time_column == input_time)[0]
+    
+    if len(time_index) == 0:
+        raise ValueError("Specified time not found in the data file.")
+    
+    index = time_index[0]
+    u_flattened = data[index, 1:total_points+1]
+    v_flattened = data[index, total_points+1:]
+    
+    u_initial = torch.tensor(u_flattened, dtype=torch.float32).flatten()
+    v_initial = torch.tensor(v_flattened, dtype=torch.float32).flatten()
+    
+    return u_initial, v_initial
+
+# Load initial conditions at t=250
+u_ic, v_ic = load_initial_conditions(input_time=250)
+
+
 # Defines the residual function for the FitzHugh-Nagumo model. a, beta, gamma, delta, and eps represent standard FHN model coefficients.
 def residual(model, input):
     input_tensor = input.clone().detach().requires_grad_(True)  # Ensure gradient tracking
