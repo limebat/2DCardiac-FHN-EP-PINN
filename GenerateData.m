@@ -44,15 +44,16 @@ fprintf(fileID, 'sec, V, H\n');
 fprintf(fileIDMESH, 'X, Y\n'); 
 
 
-% Save initial state data at t = 0
-data_row_0 = [0, v(:)', h(:)']; % Flatten v and h and include time = 0
-fprintf(fileID, '%g', data_row_0(1)); % Print the first value without a leading comma
-for j = 2:length(data_row_0)
-    fprintf(fileID, ', %g', data_row_0(j)); % Print subsequent values with a leading comma
-end
-fprintf(fileID, '\n'); % Move to the next line
+%% Save initial state data at t = 0
+%data_row_0 = [0, v(:)', h(:)']; % Flatten v and h and include time = 0
+%fprintf(fileID, '%g', data_row_0(1)); % Print the first value without a leading comma
+%for j = 2:length(data_row_0)
+%    fprintf(fileID, ', %g', data_row_0(j)); % Print subsequent values with a leading comma
+%end
+%fprintf(fileID, '\n'); % Move to the next line
 
-
+%Begin recording time and their iterations
+record_iterations_begin = 200;
 t = 0:dt:endtime;
 xx=1:nx;
 xx=xx*dx;
@@ -119,7 +120,7 @@ for ntime=1:nsteps
 %    v = v + dt*dv + diff*dt_o_dx2*xlap;
     v = v + dt*dv + xlap;
     h = h + dt*dh;
-    if mod(ntime*dt, 10) == 0
+    if mod(ntime*dt, 10) == 0 && ntime*dt > record_iterations_begin
         pcolor(v),shading interp,daspect([1 1 1]),caxis([0 1]),colorbar,title(["time = " num2str(ntime*dt)]),drawnow
 
         % Save state variables

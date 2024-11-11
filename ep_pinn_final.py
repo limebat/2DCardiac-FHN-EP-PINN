@@ -17,14 +17,14 @@ delta = 0.0     # -
 eps = 0.01      # -
 dx = 0.2        # -
 dt = 10        # -
-end_time = 50
+end_time = 300
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = 250   # Number of spatial points in x and y directions
 NeuronCount = [3, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
 N_ic, N_res, N_analytical = 10**2, 10**2, 10**2  # Number of initial conditions, residual points, and analytical points
 epoch_max = int(1e4)  # Number of epochs
 
-times = torch.arange(0, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
+times = torch.arange(250, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
 
 print(times)
 
@@ -35,11 +35,11 @@ print(times)
 
 x_end = y_end = 250
 
-v_ic = 0.5 * torch.ones((int(N_ic), int(N_ic)), dtype=torch.float32).flatten()
-u_ic = torch.zeros_like(v_ic)
+#v_ic = 0.5 * torch.ones((int(N_ic), int(N_ic)), dtype=torch.float32).flatten()
+#u_ic = torch.zeros_like(v_ic)
 
 # Function to return initial x / y / t values separately for ICs and residuals so they don't have to be the same. Create grid over x, y with t=0.
-def return_x_tensor(N, is_IC):
+def return_x_tensor(N, is_IC, input_time):
     # Values for residuals so they don't have to be the same as those for ICs: grid over x, y with t=0
     x_vals = torch.linspace(0, x_end, N)
     y_vals = torch.linspace(0, y_end, N)
@@ -49,7 +49,7 @@ def return_x_tensor(N, is_IC):
 
     if is_IC == True:
         num_time_steps = 1
-        t = torch.zeros_like(x_flat)  # Only apply IC at t=0
+        t = torch.full_like(x_flat, input_time)  # Only apply IC at t=initial condition time
     else:
         num_time_steps = len(times)  
         t = times.repeat(N * N, 1)  # Repeated time steps for every x,y combination possible with all t values
@@ -60,33 +60,6 @@ def return_x_tensor(N, is_IC):
     x_tensor = torch.cat([x_flat.repeat(num_time_steps, 1), y_flat.repeat(num_time_steps, 1), t.view(-1, 1)], dim=1)  # Shape: [N_res * N_res * num_time_steps, 3]
     
     return x_tensor
-
-x_ic = return_x_tensor(N_ic, is_IC=True)
-x_res = return_x_tensor(N_res, is_IC=False)
-
-
-class PINN(nn.Module):
-    # Initialize network with NeuronCount defining the number of neurons in each layer.
-    # Params:
-    #   NeuronCount - List of integers defining the number of neurons in each subsequent layer
-    def __init__(self, NeuronCount):
-        super(PINN, self).__init__()
-        self.layers = nn.ModuleList()
-        for i in range(len(NeuronCount) - 1):
-            self.layers.append(nn.Linear(NeuronCount[i], NeuronCount[i + 1]))
-
-    # Neural network forward pass method. Use tanh activation function for hidden layers.
-    # Params:
-    #   x - Input tensor; iteratively passed through each network layer
-    def forward(self, x):
-        for i in range(len(self.layers) - 1):
-            x = torch.tanh(self.layers[i](x))  # TANH HIDDEN LAYERS
-        x = self.layers[-1](x)  # FINAL LAYER, NO ACTIVATION
-        u = x[:, 0]
-        v = x[:, 1]
-        return u, v  # Return two outputs: u and v
-
-
 
 # input_time should be 250 if wanting to observe the spiral reults
 def load_initial_conditions(input_time):
@@ -109,10 +82,50 @@ def load_initial_conditions(input_time):
     u_initial = torch.tensor(u_flattened, dtype=torch.float32).flatten()
     v_initial = torch.tensor(v_flattened, dtype=torch.float32).flatten()
     
-    return u_initial, v_initial
+    
+    u_ic_2D = u_initial.view(nx, ny)
+    v_ic_2D = v_initial.view(nx, ny)
+    
+    
+    downsampled_x_indices = np.linspace(0, nx - 1, N_ic, dtype=int)
+    downsampled_y_indices = np.linspace(0, ny - 1, N_ic, dtype=int)
+
+    u_ic_sampled = u_ic_2D[downsampled_x_indices][:, downsampled_y_indices].flatten()
+    v_ic_sampled = v_ic_2D[downsampled_x_indices][:, downsampled_y_indices].flatten()
+
+    print(f"Uniformly downsampled u_ic shape: {u_ic_sampled.shape}")
+    print(f"Uniformly downsampled v_ic shape: {v_ic_sampled.shape}")
+    
+    return u_ic_sampled, v_ic_sampled
 
 # Load initial conditions at t=250
 u_ic, v_ic = load_initial_conditions(input_time=250)
+
+#Make tensors for IC and residuals for later use in the code.
+x_ic = return_x_tensor(N_ic, is_IC=True, input_time=250)
+x_res = return_x_tensor(N_res, is_IC=False, input_time=250)
+
+
+class PINN(nn.Module):
+    # Initialize network with NeuronCount defining the number of neurons in each layer.
+    # Params:
+    #   NeuronCount - List of integers defining the number of neurons in each subsequent layer
+    def __init__(self, NeuronCount):
+        super(PINN, self).__init__()
+        self.layers = nn.ModuleList()
+        for i in range(len(NeuronCount) - 1):
+            self.layers.append(nn.Linear(NeuronCount[i], NeuronCount[i + 1]))
+
+    # Neural network forward pass method. Use tanh activation function for hidden layers.
+    # Params:
+    #   x - Input tensor; iteratively passed through each network layer
+    def forward(self, x):
+        for i in range(len(self.layers) - 1):
+            x = torch.tanh(self.layers[i](x))  # TANH HIDDEN LAYERS
+        x = self.layers[-1](x)  # FINAL LAYER, NO ACTIVATION
+        u = x[:, 0]
+        v = x[:, 1]
+        return u, v  # Return two outputs: u and v
 
 
 # Defines the residual function for the FitzHugh-Nagumo model. a, beta, gamma, delta, and eps represent standard FHN model coefficients.
