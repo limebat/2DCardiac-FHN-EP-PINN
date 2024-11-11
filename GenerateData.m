@@ -120,7 +120,7 @@ for ntime=1:nsteps
 %    v = v + dt*dv + diff*dt_o_dx2*xlap;
     v = v + dt*dv + xlap;
     h = h + dt*dh;
-    if mod(ntime*dt, 10) == 0 && ntime*dt > record_iterations_begin
+    if mod(ntime*dt, 5) == 0 && ntime*dt > record_iterations_begin
         pcolor(v),shading interp,daspect([1 1 1]),caxis([0 1]),colorbar,title(["time = " num2str(ntime*dt)]),drawnow
 
         % Save state variables
