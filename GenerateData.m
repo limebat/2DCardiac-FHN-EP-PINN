@@ -18,17 +18,19 @@ v_gate=0.13; %0.13 %0.35 gives oscillatory
 
 v_stim=0.056; %twice diastolic threshold for 2ms duration
 
+convolution_factor = 5;
+
 % numerical and stimulation parameters
 dt = 0.25;
-endtime = 360;
+endtime = 350;
 nsteps = ceil(endtime/dt);
 stimdur= 2;
 nstimdur = ceil(stimdur/dt);
 spiraltime=250;
 nspiraltime=ceil(spiraltime/dt);
-dx=0.05;
+dx=0.05*convolution_factor; %*5^(1/2)
 diff=0.001; % diffusion coefficient
-nx=250;
+nx=250/convolution_factor;
 ny=nx;
 dt_o_dx2=dt/(dx*dx);
 %paceevery=270;
@@ -57,8 +59,6 @@ record_iterations_begin = 200;
 t = 0:dt:endtime;
 xx=1:nx;
 xx=xx*dx;
-
-
 
 % time loop
 for ntime=1:nsteps
@@ -130,11 +130,11 @@ for ntime=1:nsteps
         h_flatten = h(:)';
         data_row = [ntime*dt, v_flatten, h_flatten];
         % Print the data row without an extra comma at the end
-        fprintf(fileID, '%g', data_row(1)); % Print the first value without a leading comma
-        for j = 2:length(data_row)
-            fprintf(fileID, ', %g', data_row(j)); % Print subsequent values with a leading comma
-        end
-        fprintf(fileID, '\n'); % Move to the next line
+        %fprintf(fileID, '%g', data_row(1)); % Print the first value without a leading comma
+        %for j = 2:length(data_row)
+        %    fprintf(fileID, ', %g', data_row(j)); % Print subsequent values with a leading comma
+        %end
+        %fprintf(fileID, '\n'); % Move to the next line
             
     end
 end

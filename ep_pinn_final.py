@@ -16,10 +16,10 @@ gamma = 1       # -
 delta = 0.0     # -
 eps = 0.01      # -
 dx = 0.2        # -
-dt = 10        # -
-end_time = 300
+dt = 5        # -
+end_time = 350
 D_u = 1e-3      # Our diffusion coefficient for u
-nx = ny = 250   # Number of spatial points in x and y directions
+nx = ny = 250/5   # Number of spatial points in x and y directions
 NeuronCount = [3, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
 N_ic, N_res, N_analytical, N_bc = 10**2, 10**2, 10**2, 10**2  # Number of initial conditions, residual points, and analytical points
 epoch_max = int(1e4)  # Number of epochs
@@ -323,7 +323,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-1):
         times - A vector of times from 0 --> final time at spacing dt
     '''
     start_time = time.time()
-    optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
         
     x_ic_tensor = x_ic.clone().detach()  # Reuse x_ic
     x_res_tensor = x_res.clone().detach()  # Reuse x_res
@@ -332,6 +332,8 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-1):
         optimizer.zero_grad()
         #x_ic_tensor = torch.tensor(x_ic, dtype=torch.float32)
         #x_res_tensor = torch.tensor(x_res, dtype=torch.float32)
+        
+        #loss_bc = BC_loss(model, N_bc)
 
         #loss_ic = IC_loss(model, x_ic_tensor)
         loss_residual = residual_loss(model, x_res_tensor)
