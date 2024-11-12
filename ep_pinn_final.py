@@ -17,12 +17,12 @@ delta = 0.0     # -
 eps = 0.01      # -
 dx = 0.05 * 5         # -
 dt = 25        # -
-end_time = 251
+end_time = 400
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = 250 // 5   # Number of spatial points in x and y directions
 NeuronCount = [3, 32, 32, 32, 32, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
 N_ic, N_res, N_analytical, N_bc = 7**2, 7**2, 7**2, 7**2  # Number of initial conditions, residual points, and analytical points
-epoch_max = int(10e2)  # Number of epochs
+epoch_max = int(5e2)  # Number of epochs
 
 times = torch.arange(250, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
 print(times)
@@ -187,10 +187,9 @@ def analytical_solution(input, input_time):
     if len(time_index) == 0:
         raise ValueError(f"Specified time {input_time} not found in the data file.")
     
-    
     index = time_index
-    u_flattened = data[index, 1:total_points+1] # The first half of data contains u values -- +1 to skip time-index at first element
-    v_flattened = data[index, total_points+1:]  # And the second half contains v values
+    u_flattened = data[index, 1:total_points+1].flatten() # The first half of data contains u values -- +1 to skip time-index at first element
+    v_flattened = data[index, total_points+1:].flatten()  # And the second half contains v values
     
     u_reshaped = u_flattened.reshape(nx, ny)
     v_reshaped = v_flattened.reshape(nx, ny)
@@ -322,13 +321,13 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
     for epoch in range(epoch_max):
         optimizer.zero_grad()
 
-        #loss_ic = IC_loss(model, x_ic_tensor)
+        loss_ic = IC_loss(model, x_ic_tensor)
         loss_residual = residual_loss(model, x_res_tensor)
         loss_PDE = PDE_loss(model, N_analytical, times)
         loss_bc = BC_loss(model, N_bc, times)
 
         #loss_ic + 
-        loss_tot = loss_residual + loss_PDE + loss_bc#loss_residual #+ loss_PDE + loss_bc
+        loss_tot = loss_ic + loss_residual + 10 * loss_PDE + loss_bc#loss_residual #+ loss_PDE + loss_bc
         
         #Backwards pass the total loss
         loss_tot.backward()
@@ -341,7 +340,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
 
         # Keep track of our losses at periodic intervals.
         if epoch % 50 == 0:
-            print(f"Epoch {epoch}, Loss BC: {loss_bc.item()}, Loss Residual: {loss_residual.item()}, Loss PDE: {loss_PDE.item()}") #Loss IC: {loss_ic.item()}, 
+            print(f"Epoch {epoch}, Loss IC: {loss_ic.item()}, Loss BC: {loss_bc.item()}, Loss Residual: {loss_residual.item()}, Loss PDE: {loss_PDE.item()}") #Loss IC: {loss_ic.item()}, 
 
         if loss_tot < tolerance:
             break
