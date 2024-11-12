@@ -15,13 +15,13 @@ beta = 0.5      # -
 gamma = 1       # -
 delta = 0.0     # -
 eps = 0.01      # -
-dx = 0.2        # -
+dx = 0.05 * 5        # -
 dt = 5        # -
 end_time = 350
 D_u = 1e-3      # Our diffusion coefficient for u
-nx = ny = 250/5   # Number of spatial points in x and y directions
+nx = ny = 250//5   # Number of spatial points in x and y directions
 NeuronCount = [3, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
-N_ic, N_res, N_analytical, N_bc = 10**2, 10**2, 10**2, 10**2  # Number of initial conditions, residual points, and analytical points
+N_ic, N_res, N_analytical, N_bc = 3**2, 5**2, 5**2, 3**2  # Number of initial conditions, residual points, and analytical points
 epoch_max = int(1e4)  # Number of epochs
 
 times = torch.arange(250, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
@@ -187,6 +187,10 @@ def analytical_solution(input, input_time):
     # Find the index corresponding to input_time
     time_index = np.where(time_column == input_time)[0]
     
+    if len(time_index) == 0:
+        raise ValueError(f"Specified time {input_time} not found in the data file.")
+    
+    
     index = time_index
     u_flattened = data[index, 1:total_points+1] # The first half of data contains u values -- +1 to skip time-index at first element
     v_flattened = data[index, total_points+1:]  # And the second half contains v values
@@ -203,50 +207,36 @@ def analytical_solution(input, input_time):
     return sampled_u, sampled_v
 
 
-def BC_loss(model, N_bc):
-    # Define a downsampled grid for boundary conditions
-    x_vals = torch.linspace(0, nx - 1, N_bc, dtype=int)
-    y_vals = torch.linspace(0, ny - 1, N_bc, dtype=int)
-    x_bc_tensor = torch.zeros((N_bc, N_bc))
-
-    # Load analytical solution at t=0
-    u_analytical, v_analytical = analytical_solution(input=None, input_time=0)
-    u_analytical = u_analytical.view(nx, ny)
-
-    # Compute Laplacian on the boundary points
-    for i, xi in enumerate(x_vals):
-        for j, yj in enumerate(y_vals):
-            if xi == 0:
-                xlap1 = 2 * (u_analytical[1, yj] - u_analytical[0, yj])
-            elif xi == nx - 1:
-                xlap1 = 2 * (u_analytical[nx - 2, yj] - u_analytical[nx - 1, yj])
-            else:
-                xlap1 = u_analytical[xi - 1, yj] - 2 * u_analytical[xi, yj] + u_analytical[xi + 1, yj]
-
-            if yj == 0:
-                xlap2 = 2 * (u_analytical[xi, 1] - u_analytical[xi, 0])
-            elif yj == ny - 1:
-                xlap2 = 2 * (u_analytical[xi, ny - 2] - u_analytical[xi, ny - 1])
-            else:
-                xlap2 = u_analytical[xi, yj - 1] - 2 * u_analytical[xi, yj] + u_analytical[xi, yj + 1]
-
-            x_bc_tensor[i, j] = xlap1 + xlap2
-
-    # Rescale for diffusion
-    x_bc_tensor *= D_u * (dt / dx ** 2)
-
-    # Predict using the model
-    x_bc_tensor_flat = x_bc_tensor.flatten().unsqueeze(-1)
-    u_bc_pred, v_bc_pred = model(x_bc_tensor_flat)
-
-    # Extract corresponding analytical values and compute MSE loss
-    u_analytical_bc = u_analytical[x_vals][:, y_vals].flatten()
-    v_analytical_bc = v_analytical[x_vals][:, y_vals].flatten()
+def BC_loss(model, N_bc, times):
+    total_loss_bc = 0
     
-    loss_bc = torch.mean((u_bc_pred - u_analytical_bc) ** 2 + (v_bc_pred - v_analytical_bc) ** 2)  # MSE
+    for input_time in times:
+        # Sample top, bottom, left, right
+        x_boundary = torch.linspace(0, nx - 1, N_bc, dtype=int)
+        y_boundary = torch.linspace(0, ny - 1, N_bc, dtype=int)
+        
+        # Define the walls at the boundaries of the analytical solution, N_bc long
+        top_wall = torch.stack([x_boundary, torch.zeros(N_bc, dtype=int)], dim=1)
+        bottom_wall = torch.stack([x_boundary, (ny - 1) * torch.ones(N_bc, dtype=int)], dim=1)
+        left_wall = torch.stack([torch.zeros(N_bc, dtype=int), y_boundary], dim=1)
+        right_wall = torch.stack([(nx - 1) * torch.ones(N_bc, dtype=int), y_boundary], dim=1)
+        
+        # Combine all walls into a single tensor, which will be read for the combined time-tensor as well.
+        sampled_xy = torch.cat([top_wall, bottom_wall, left_wall, right_wall], dim=0)
+        time_tensor = input_time * torch.ones(sampled_xy.size(0), 1)
+        sampled_xy = torch.cat([sampled_xy, time_tensor], dim=1)
+        
+        # Now see what the model will predict for the given samples in xy, at time t. 
+        u_bc_pred, v_bc_pred = model(sampled_xy)
+        u_analytical, v_analytical = analytical_solution(sampled_xy, input_time)
 
-    return loss_bc
-
+        # MSE error
+        loss_bc = torch.mean((u_bc_pred - u_analytical) ** 2 + (v_bc_pred - v_analytical) ** 2)
+        
+        total_loss_bc += loss_bc
+    
+    # Average loss across time steps
+    return total_loss_bc / len(times)
 
 
 def IC_loss(model, x_ic_tensor):
@@ -333,21 +323,21 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-1):
         #x_ic_tensor = torch.tensor(x_ic, dtype=torch.float32)
         #x_res_tensor = torch.tensor(x_res, dtype=torch.float32)
         
-        #loss_bc = BC_loss(model, N_bc)
 
         #loss_ic = IC_loss(model, x_ic_tensor)
         loss_residual = residual_loss(model, x_res_tensor)
         loss_PDE = PDE_loss(model, N_analytical, times)
+        loss_bc = BC_loss(model, N_bc, times)
 
         #loss_ic + 
-        loss_tot = loss_residual + loss_PDE
+        loss_tot = loss_residual + loss_PDE + loss_bc
 
         loss_tot.backward()
         optimizer.step()
 
         # Keep track of our losses at periodic intervals.
         if epoch % 1 == 0:
-            print(f"Epoch {epoch}, Loss Residual: {loss_residual.item()}, Loss PDE: {loss_PDE.item()}") #Loss IC: {loss_ic.item()}, 
+            print(f"Epoch {epoch}, Loss BC: {loss_bc.item()}, Loss Residual: {loss_residual.item()}, Loss PDE: {loss_PDE.item()}") #Loss IC: {loss_ic.item()}, 
 
         if loss_tot < tolerance:
             break

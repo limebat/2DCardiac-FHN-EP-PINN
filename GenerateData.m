@@ -130,11 +130,11 @@ for ntime=1:nsteps
         h_flatten = h(:)';
         data_row = [ntime*dt, v_flatten, h_flatten];
         % Print the data row without an extra comma at the end
-        %fprintf(fileID, '%g', data_row(1)); % Print the first value without a leading comma
-        %for j = 2:length(data_row)
-        %    fprintf(fileID, ', %g', data_row(j)); % Print subsequent values with a leading comma
-        %end
-        %fprintf(fileID, '\n'); % Move to the next line
+        fprintf(fileID, '%g', data_row(1)); % Print the first value without a leading comma
+        for j = 2:length(data_row)
+            fprintf(fileID, ', %g', data_row(j)); % Print subsequent values with a leading comma
+        end
+        fprintf(fileID, '\n'); % Move to the next line
             
     end
 end
