@@ -22,7 +22,7 @@ convolution_factor = 5;
 
 % numerical and stimulation parameters
 dt = 0.25;
-endtime = 350;
+endtime = 500;
 nsteps = ceil(endtime/dt);
 stimdur= 2;
 nstimdur = ceil(stimdur/dt);
@@ -55,7 +55,7 @@ fprintf(fileIDMESH, 'X, Y\n');
 %fprintf(fileID, '\n'); % Move to the next line
 
 %Begin recording time and their iterations
-record_iterations_begin = 200;
+record_iterations_begin = 249;
 t = 0:dt:endtime;
 xx=1:nx;
 xx=xx*dx;
@@ -120,7 +120,7 @@ for ntime=1:nsteps
 %    v = v + dt*dv + diff*dt_o_dx2*xlap;
     v = v + dt*dv + xlap;
     h = h + dt*dh;
-    if mod(ntime*dt, 5) == 0 && ntime*dt > record_iterations_begin
+    if mod(ntime*dt, 25) == 0 && ntime*dt > record_iterations_begin
         pcolor(v),shading interp,daspect([1 1 1]),caxis([0 1]),colorbar,title(["time = " num2str(ntime*dt)]),drawnow
 
         % Save state variables

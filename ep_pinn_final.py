@@ -15,19 +15,19 @@ beta = 0.5      # -
 gamma = 1       # -
 delta = 0.0     # -
 eps = 0.01      # -
-dx = 0.05 * 5        # -
-dt = 5        # -
-end_time = 350
+dx = 0.05 * 5         # -
+dt = 25        # -
+end_time = 251
 D_u = 1e-3      # Our diffusion coefficient for u
-nx = ny = 250//5   # Number of spatial points in x and y directions
-NeuronCount = [3, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
-N_ic, N_res, N_analytical, N_bc = 3**2, 5**2, 5**2, 3**2  # Number of initial conditions, residual points, and analytical points
-epoch_max = int(1e4)  # Number of epochs
+nx = ny = 250 // 5   # Number of spatial points in x and y directions
+NeuronCount = [3, 32, 32, 32, 32, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
+N_ic, N_res, N_analytical, N_bc = 7**2, 7**2, 7**2, 7**2  # Number of initial conditions, residual points, and analytical points
+epoch_max = int(10e2)  # Number of epochs
 
 times = torch.arange(250, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
 print(times)
 
-x_end = y_end = 250
+x_end = y_end = 250 
 
 # Function to return initial x / y / t values separately for ICs and residuals so they don't have to be the same. Create grid over x, y with t=0.
 def return_x_tensor(N, is_IC, input_time):
@@ -119,36 +119,34 @@ class PINN(nn.Module):
         return u, v  # Return two outputs: u and v
 
 
-# Defines the residual function for the FitzHugh-Nagumo model. a, beta, gamma, delta, and eps represent standard FHN model coefficients.
 def residual(model, input):
-    input_tensor = input.clone().detach().requires_grad_(True)  # Ensure gradient tracking
+    # Ensure input is properly detached and requires gradients for the needed variables
+    input_tensor = input.clone().detach().requires_grad_(True)  # Enable gradients for the input
+    
+    # Extract variables
     x_tensor = input_tensor[:, 0]
     y_tensor = input_tensor[:, 1]
     t_tensor = input_tensor[:, 2]
-
-    u_pred, v_pred = model(input_tensor)
-
-    x_tensor.requires_grad_(True)
-    y_tensor.requires_grad_(True)
-    t_tensor.requires_grad_(True)
     
+    # Get model predictions
+    u_pred, v_pred = model(input_tensor)
+    
+    # Ensure u_pred and v_pred also require gradients
     u_pred.requires_grad_(True)
     v_pred.requires_grad_(True)
-    
-    # Time derivatives
+
+    # Time derivatives: Derivatives of u_pred and v_pred with respect to time
     u_t_pred = torch.autograd.grad(u_pred, t_tensor, grad_outputs=torch.ones_like(u_pred), create_graph=True, allow_unused=True)[0]
     v_t_pred = torch.autograd.grad(v_pred, t_tensor, grad_outputs=torch.ones_like(v_pred), create_graph=True, allow_unused=True)[0]
 
-    # Spatial derivatives for u
+    # Spatial derivatives for u (x and y directions)
     u_x_pred = torch.autograd.grad(u_pred, x_tensor, grad_outputs=torch.ones_like(u_pred), create_graph=True, allow_unused=True)[0]
-    #if u_x_pred == None:
-    #    u_x_pred = u_pred
     u_xx_pred = torch.autograd.grad(u_x_pred, x_tensor, grad_outputs=torch.ones_like(u_x_pred), create_graph=True, allow_unused=True)[0] if u_x_pred is not None else None
 
     u_y_pred = torch.autograd.grad(u_pred, y_tensor, grad_outputs=torch.ones_like(u_pred), create_graph=True, allow_unused=True)[0]
     u_yy_pred = torch.autograd.grad(u_y_pred, y_tensor, grad_outputs=torch.ones_like(u_y_pred), create_graph=True, allow_unused=True)[0] if u_y_pred is not None else None
 
-    # Apply gradient keys and assign their values for iteration -- if a key is None, apply 0.
+    # Handle gradients that might be None (if 'allow_unused=True')
     gradients = {
         'u_t_pred': u_t_pred,
         'v_t_pred': v_t_pred,
@@ -157,22 +155,21 @@ def residual(model, input):
         'u_xx_pred': u_xx_pred,
         'u_yy_pred': u_yy_pred
     }
-    zeros_vectors = {
-        'u_pred': u_pred,
-        'v_pred': v_pred
-    }
-    for key in gradients.keys():
-        if gradients[key] is None:
-            gradients[key] = torch.zeros_like(zeros_vectors['u_pred' if 'u_' in key else 'v_pred'])
-        #print(f'{key} value:', gradients[key])
 
-    # Compute the Laplacian of u: u_xx + u_yy
+    # If any gradient is None, replace with a tensor of zeros
+    for key in gradients:
+        if gradients[key] is None:
+            gradients[key] = torch.zeros_like(u_pred)  # Assuming u_pred and v_pred have the same shape
+
+    # Compute Laplacian of u (sum of second derivatives in x and y directions)
     laplace_u = gradients['u_xx_pred'] + gradients['u_yy_pred']
 
+    # Define residuals (FitzHugh-Nagumo PDE)
     residual_u = gradients['u_t_pred'] - (u_pred * (1 - u_pred) * (u_pred - a) - u_pred * v_pred + D_u * laplace_u)
     residual_v = gradients['v_t_pred'] - eps * (beta * u_pred - gamma * v_pred - delta)
 
     return residual_u, residual_v
+
 
 
 # Defines the analytical solution. This function uses data generated from the MATLAB file, which generates our baseline using Mitchell-Schaeffer.
@@ -283,6 +280,7 @@ def PDE_loss(model, N_analytical, times):
         sampled_indices_x = torch.arange(0, nx, step_size_x)
         sampled_indices_y = torch.arange(0, ny, step_size_y)
         sampled_x_mesh, sampled_y_mesh = torch.meshgrid(sampled_indices_x, sampled_indices_y)
+        
         sampled_indices = (sampled_y_mesh * nx + sampled_x_mesh).flatten()  # Calculate flattened indices
 
         # Select sampled points from xy using these indices
@@ -290,8 +288,8 @@ def PDE_loss(model, N_analytical, times):
 
         # Use sampled_xy in the model and analytical solution
         u_pred_analytical, v_pred_analytical = model(sampled_xy)
+        
         u_analytical, v_analytical = analytical_solution(sampled_xy, input_time)
-
 
         loss_PDE = torch.sqrt(torch.mean((u_pred_analytical - u_analytical) ** 2 + (v_pred_analytical - v_analytical) ** 2))
         total_loss_PDE += loss_PDE
@@ -301,7 +299,7 @@ def PDE_loss(model, N_analytical, times):
 
 
 
-def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-1):
+def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
     '''
     Loss function combining the three described above.
     Params:
@@ -313,16 +311,16 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-1):
         times - A vector of times from 0 --> final time at spacing dt
     '''
     start_time = time.time()
+    # Choose Adams optimizer w/ set learning rate
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+    #Decay steps as time progresses for the PDE.
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=100, verbose=True)
         
     x_ic_tensor = x_ic.clone().detach()  # Reuse x_ic
     x_res_tensor = x_res.clone().detach()  # Reuse x_res
     
     for epoch in range(epoch_max):
         optimizer.zero_grad()
-        #x_ic_tensor = torch.tensor(x_ic, dtype=torch.float32)
-        #x_res_tensor = torch.tensor(x_res, dtype=torch.float32)
-        
 
         #loss_ic = IC_loss(model, x_ic_tensor)
         loss_residual = residual_loss(model, x_res_tensor)
@@ -330,13 +328,19 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-1):
         loss_bc = BC_loss(model, N_bc, times)
 
         #loss_ic + 
-        loss_tot = loss_residual + loss_PDE + loss_bc
-
+        loss_tot = loss_residual + loss_PDE + loss_bc#loss_residual #+ loss_PDE + loss_bc
+        
+        #Backwards pass the total loss
         loss_tot.backward()
+        #Then control the gradient parameters so that we prevent exploding gradients
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        #Now update
         optimizer.step()
+        #And then decay the step size
+        scheduler.step(loss_tot)
 
         # Keep track of our losses at periodic intervals.
-        if epoch % 1 == 0:
+        if epoch % 50 == 0:
             print(f"Epoch {epoch}, Loss BC: {loss_bc.item()}, Loss Residual: {loss_residual.item()}, Loss PDE: {loss_PDE.item()}") #Loss IC: {loss_ic.item()}, 
 
         if loss_tot < tolerance:
