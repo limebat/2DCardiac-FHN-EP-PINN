@@ -15,19 +15,21 @@ beta = 0.5      # -
 gamma = 1       # -
 delta = 0.0     # -
 eps = 0.01      # -
-dx = 0.05 * 5         # -
-dt = 25        # -
-end_time = 400
+conv_factor = 2.5
+dx = 0.05 * conv_factor         # -
+dt = 0.25        # -
+begin_time = 550
+end_time = 555
 D_u = 1e-3      # Our diffusion coefficient for u
-nx = ny = 250 // 5   # Number of spatial points in x and y directions
-NeuronCount = [3, 32, 32, 32, 32, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
-N_ic, N_res, N_analytical, N_bc = 7**2, 7**2, 7**2, 7**2  # Number of initial conditions, residual points, and analytical points
-epoch_max = int(5e2)  # Number of epochs
+nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
+NeuronCount = [3, 30, 30, 30, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
+N_ic, N_res, N_analytical, N_bc = 4**2, 4**2, 2**2, 4**2  # Number of initial conditions, residual points, and analytical points
+epoch_max = int(20e2)  # Number of epochs
 
-times = torch.arange(250, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
+times = torch.arange(begin_time, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
 print(times)
 
-x_end = y_end = 250 
+x_end = y_end = nx * dx
 
 # Function to return initial x / y / t values separately for ICs and residuals so they don't have to be the same. Create grid over x, y with t=0.
 def return_x_tensor(N, is_IC, input_time):
@@ -63,10 +65,12 @@ def load_initial_conditions(input_time):
     # Locate the row where time equals 250
     time_index = np.where(time_column == input_time)[0]
     
+    
     if len(time_index) == 0:
         raise ValueError("Specified time not found in the data file.")
     
-    index = time_index[0]
+    index = int(time_index[0])
+    
     u_flattened = data[index, 1:total_points+1]
     v_flattened = data[index, total_points+1:]
     
@@ -89,12 +93,12 @@ def load_initial_conditions(input_time):
     
     return u_ic_sampled, v_ic_sampled
 
-# Load initial conditions at t=250
-u_ic, v_ic = load_initial_conditions(input_time=250)
+# Load initial conditions at t=begin_time
+u_ic, v_ic = load_initial_conditions(input_time=begin_time)
 
 #Make tensors for IC and residuals for later use in the code.
-x_ic = return_x_tensor(N_ic, is_IC=True, input_time=250)
-x_res = return_x_tensor(N_res, is_IC=False, input_time=250)
+x_ic = return_x_tensor(N_ic, is_IC=True, input_time=begin_time)
+x_res = return_x_tensor(N_res, is_IC=False, input_time=begin_time)
 
 
 class PINN(nn.Module):
@@ -118,56 +122,80 @@ class PINN(nn.Module):
         v = x[:, 1]
         return u, v  # Return two outputs: u and v
 
-
 def residual(model, input):
-    # Ensure input is properly detached and requires gradients for the needed variables
-    input_tensor = input.clone().detach().requires_grad_(True)  # Enable gradients for the input
+    # Only detach the input once and enable gradients
+    input_tensor = input.clone().detach().requires_grad_(True)
     
     # Extract variables
-    x_tensor = input_tensor[:, 0]
-    y_tensor = input_tensor[:, 1]
-    t_tensor = input_tensor[:, 2]
+    x_tensor = input_tensor[:, 0].unsqueeze(1)
+    y_tensor = input_tensor[:, 1].unsqueeze(1)
+    t_tensor = input_tensor[:, 2].unsqueeze(1)
     
-    # Get model predictions
-    u_pred, v_pred = model(input_tensor)
+    input_combined = torch.cat([x_tensor, y_tensor, t_tensor], dim=1)
     
-    # Ensure u_pred and v_pred also require gradients
-    u_pred.requires_grad_(True)
-    v_pred.requires_grad_(True)
-
-    # Time derivatives: Derivatives of u_pred and v_pred with respect to time
-    u_t_pred = torch.autograd.grad(u_pred, t_tensor, grad_outputs=torch.ones_like(u_pred), create_graph=True, allow_unused=True)[0]
-    v_t_pred = torch.autograd.grad(v_pred, t_tensor, grad_outputs=torch.ones_like(v_pred), create_graph=True, allow_unused=True)[0]
-
-    # Spatial derivatives for u (x and y directions)
-    u_x_pred = torch.autograd.grad(u_pred, x_tensor, grad_outputs=torch.ones_like(u_pred), create_graph=True, allow_unused=True)[0]
-    u_xx_pred = torch.autograd.grad(u_x_pred, x_tensor, grad_outputs=torch.ones_like(u_x_pred), create_graph=True, allow_unused=True)[0] if u_x_pred is not None else None
-
-    u_y_pred = torch.autograd.grad(u_pred, y_tensor, grad_outputs=torch.ones_like(u_pred), create_graph=True, allow_unused=True)[0]
-    u_yy_pred = torch.autograd.grad(u_y_pred, y_tensor, grad_outputs=torch.ones_like(u_y_pred), create_graph=True, allow_unused=True)[0] if u_y_pred is not None else None
-
-    # Handle gradients that might be None (if 'allow_unused=True')
-    gradients = {
-        'u_t_pred': u_t_pred,
-        'v_t_pred': v_t_pred,
-        'u_x_pred': u_x_pred,
-        'u_y_pred': u_y_pred,
-        'u_xx_pred': u_xx_pred,
-        'u_yy_pred': u_yy_pred
-    }
-
-    # If any gradient is None, replace with a tensor of zeros
-    for key in gradients:
-        if gradients[key] is None:
-            gradients[key] = torch.zeros_like(u_pred)  # Assuming u_pred and v_pred have the same shape
-
-    # Compute Laplacian of u (sum of second derivatives in x and y directions)
-    laplace_u = gradients['u_xx_pred'] + gradients['u_yy_pred']
-
+    # Get model predictions - DO NOT detach these
+    u_pred, v_pred = model(input_combined)
+    
+    # Create gradient outputs of appropriate size
+    grad_outputs = torch.ones_like(u_pred)
+    
+    # Calculate time derivatives
+    u_t_pred = torch.autograd.grad(
+        outputs=u_pred,
+        inputs=t_tensor,
+        grad_outputs=grad_outputs,
+        create_graph=True,
+        retain_graph=True
+    )[0]
+    
+    v_t_pred = torch.autograd.grad(
+        outputs=v_pred,
+        inputs=t_tensor,
+        grad_outputs=grad_outputs,
+        create_graph=True,
+        retain_graph=True
+    )[0]
+    
+    # Calculate spatial derivatives for u
+    u_x_pred = torch.autograd.grad(
+        outputs=u_pred,
+        inputs=x_tensor,
+        grad_outputs=grad_outputs,
+        create_graph=True,
+        retain_graph=True
+    )[0]
+    
+    u_xx_pred = torch.autograd.grad(
+        outputs=u_x_pred,
+        inputs=x_tensor,
+        grad_outputs=torch.ones_like(u_x_pred),
+        create_graph=True,
+        retain_graph=True
+    )[0]
+    
+    u_y_pred = torch.autograd.grad(
+        outputs=u_pred,
+        inputs=y_tensor,
+        grad_outputs=grad_outputs,
+        create_graph=True,
+        retain_graph=True
+    )[0]
+    
+    u_yy_pred = torch.autograd.grad(
+        outputs=u_y_pred,
+        inputs=y_tensor,
+        grad_outputs=torch.ones_like(u_y_pred),
+        create_graph=True,
+        retain_graph=True
+    )[0]
+    
+    # Compute Laplacian
+    laplace_u = u_xx_pred + u_yy_pred
+    
     # Define residuals (FitzHugh-Nagumo PDE)
-    residual_u = gradients['u_t_pred'] - (u_pred * (1 - u_pred) * (u_pred - a) - u_pred * v_pred + D_u * laplace_u)
-    residual_v = gradients['v_t_pred'] - eps * (beta * u_pred - gamma * v_pred - delta)
-
+    residual_u = u_t_pred - (u_pred * (1 - u_pred) * (u_pred - a) - u_pred * v_pred + D_u * laplace_u)
+    residual_v = v_t_pred - eps * (beta * u_pred - gamma * v_pred - delta)
+    
     return residual_u, residual_v
 
 
@@ -327,7 +355,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
         loss_bc = BC_loss(model, N_bc, times)
 
         #loss_ic + 
-        loss_tot = loss_ic + loss_residual + 10 * loss_PDE + loss_bc#loss_residual #+ loss_PDE + loss_bc
+        loss_tot = 1/10.0 * loss_ic + 10.0 * loss_residual + 1/10.0 * loss_PDE + loss_bc#loss_residual #+ loss_PDE + loss_bc
         
         #Backwards pass the total loss
         loss_tot.backward()
