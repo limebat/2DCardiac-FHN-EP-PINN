@@ -17,7 +17,7 @@ delta = 0.0     # -
 eps = 0.01      # -
 conv_factor = 2.5
 dx = 0.05 * conv_factor         # -
-dt = 0.25        # -
+dt = 1.0        # -
 begin_time = 550
 end_time = 555
 D_u = 1e-3      # Our diffusion coefficient for u
@@ -355,7 +355,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
         loss_bc = BC_loss(model, N_bc, times)
 
         #loss_ic + 
-        loss_tot = 1/10.0 * loss_ic + 10.0 * loss_residual + 1/10.0 * loss_PDE + loss_bc#loss_residual #+ loss_PDE + loss_bc
+        loss_tot = * loss_ic + loss_residual + * loss_PDE + loss_bc#loss_residual #+ loss_PDE + loss_bc
         
         #Backwards pass the total loss
         loss_tot.backward()
