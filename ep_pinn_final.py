@@ -15,16 +15,16 @@ beta = 0.5      # -
 gamma = 1       # -
 delta = 0.0     # -
 eps = 0.01      # -
-conv_factor = 2.5
+conv_factor = 5
 dx = 0.05 * conv_factor         # -
-dt = 0.25        # -
-begin_time = 500
-end_time = 501
+dt = 25        # -
+begin_time = 250
+end_time = 400
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
-NeuronCount = [3, 20, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
-N_ic, N_res, N_analytical, N_bc = 5**2, 7**2, 5**2, 3**2  # Number of initial conditions, residual points, and analytical points
-epoch_max = int(50)  # Number of epochs
+NeuronCount = [3, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
+N_ic, N_res, N_analytical, N_bc = 6**2, 7**2, 5**2, 7**2  # Number of initial conditions, residual points, and analytical points
+epoch_max = int(100)  # Number of epochs
 
 times = torch.arange(begin_time, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
 print(times)
@@ -256,6 +256,7 @@ def BC_loss(model, N_bc, times):
     u_analytical = torch.zeros(num_points, len(times))
     v_analytical = torch.zeros(num_points, len(times))
 
+    # TODO : Re-do this code 
     # Generate inputs for model and analytical solution for all time steps
     sampled_xy_time = []
     for i, input_time in enumerate(times):
@@ -263,11 +264,11 @@ def BC_loss(model, N_bc, times):
         sampled_xy_time.append(torch.cat([sampled_xy.float(), time_column], dim=1))
         
         # Get analytical solution at boundary for this time step
-        u_slice, v_slice = analytical_solution(sampled_xy, input_time)
+        u_slice, v_slice = analytical_solution(sampled_xy, input_time) 
         u_analytical[:, i] = u_slice
         v_analytical[:, i] = v_slice
 
-    # Stack to create a single tensor containing all boundary points and time steps
+    # Stack the tensor
     sampled_xy_time = torch.cat(sampled_xy_time, dim=0)
     
     # Compute model predictions
@@ -278,7 +279,7 @@ def BC_loss(model, N_bc, times):
     v_pred_bc = v_pred_bc.view(num_points, len(times))
 
     # Calculate boundary condition loss using mean squared error
-    loss_bc = torch.mean((u_pred_bc - u_analytical) ** 2 + (v_pred_bc - v_analytical) ** 2)
+    loss_bc = torch.sqrt(torch.mean((u_pred_bc - u_analytical) ** 2 + (v_pred_bc - v_analytical) ** 2))
 
     # Average loss across time steps
     return loss_bc
@@ -291,9 +292,8 @@ def IC_loss(model, x_ic_tensor):
         model - The PINN model
         x_ic_tensor - the initial conditions; this should be a (size of x_vals) x (size of y_vals) x (size of t=0s) tensor; see top of file
     '''
-    u_ic_pred, v_ic_pred = model(x_ic_tensor.to(device))  # Predicted output of model at this x_ic_tensor.
-    u_ic_pred, v_ic_pred =u_ic_pred.detach().cpu(), v_ic_pred.detach().cpu()
-
+    u_ic_pred, v_ic_pred = model(x_ic_tensor)  # Predicted output of model at this x_ic_tensor.
+    
     # MSE Losses
     loss_ic = torch.sqrt(torch.mean((u_ic_pred - u_ic) ** 2 + (v_ic_pred - v_ic) ** 2))  # Compute loss
     return loss_ic
@@ -303,7 +303,7 @@ def residual_loss(model, x_res_tensor):
     residual_value_u, residual_value_v = residual(model, x_res_tensor)
     loss_residual_u = torch.mean(residual_value_u ** 2)
     loss_residual_v = torch.mean(residual_value_v ** 2)
-    return loss_residual_u + loss_residual_v
+    return torch.sqrt(loss_residual_u + loss_residual_v)
 
 
 # The third of our PINN's 3 loss functions, based on the difference between the true and predicted analytical u and v values.
@@ -383,7 +383,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
     '''
     start_time = time.time()
     # Choose Adams optimizer w/ set learning rate
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=3e-2)
     #Decay steps as time progresses for the PDE.
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=100, verbose=True)
         
@@ -404,7 +404,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
         #Backwards pass the total loss
         loss_tot.backward()
         #Then control the gradient parameters so that we prevent exploding gradients
-        #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         #Now update
         optimizer.step()
         #And then decay the step size
