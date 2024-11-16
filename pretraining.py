@@ -23,8 +23,8 @@ end_time = 300          # -
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
 NeuronCount = [3, 8, 8, 8, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
-N_ic, N_res, N_analytical, N_bc = 4, 5, 3, 3  # Number of initial conditions, residual points, and analytical points
-epoch_max = int(100)  # Number of epochs
+N_ic, N_res, N_analytical, N_bc = 10, 5, 4, 4  # Number of initial conditions, residual points, and analytical points
+epoch_max = int(50)  # Number of epochs
 
 times = torch.arange(begin_time, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
 print(times)
@@ -299,19 +299,104 @@ def BC_loss(model, N_bc, times):
     # Average loss across time steps
     return loss_bc
 
-
-def IC_loss(model, x_ic_tensor):
-    '''
-    The first of our PINN's 3 loss functions, based on the difference between the true and predicted initial conditions.
-    Params:
-        model - The PINN model
-        x_ic_tensor - the initial conditions; this should be a (size of x_vals) x (size of y_vals) x (size of t=0s) tensor; see top of file
-    '''
-    u_ic_pred, v_ic_pred = model(x_ic_tensor)  # Predicted output of model at this x_ic_tensor.
+def IC_loss(model, x_ic_tensor, u_ic, v_ic, weight_decay=0.1):
+    """
+    Enhanced IC loss function with proper gradient handling
+    """
+    # Ensure input tensor requires gradients
+    x_ic_tensor = x_ic_tensor.clone().detach().requires_grad_(True)
     
-    # MSE Losses
-    loss_ic = torch.sqrt(torch.mean((u_ic_pred - u_ic) ** 2 + (v_ic_pred - v_ic) ** 2))  # Compute loss
-    return loss_ic
+    # Get model predictions
+    u_ic_pred, v_ic_pred = model(x_ic_tensor)
+    
+    # Extract spatial coordinates
+    x_spatial = x_ic_tensor[:, 0]
+    y_spatial = x_ic_tensor[:, 1]
+    
+    # 1. Compute normalized MSE loss
+    u_scale = torch.max(torch.abs(u_ic)) + 1e-8
+    v_scale = torch.max(torch.abs(v_ic)) + 1e-8
+    
+    mse_u = torch.mean(((u_ic_pred - u_ic)/u_scale) ** 2)
+    mse_v = torch.mean(((v_ic_pred - v_ic)/v_scale) ** 2)
+    
+    # 2. Spatial smoothness regularization
+    # Calculate differences between adjacent points
+    u_diff_x = torch.diff(u_ic_pred.reshape(-1, int(np.sqrt(len(u_ic)))), dim=1)
+    u_diff_y = torch.diff(u_ic_pred.reshape(-1, int(np.sqrt(len(u_ic)))), dim=0)
+    
+    v_diff_x = torch.diff(v_ic_pred.reshape(-1, int(np.sqrt(len(v_ic)))), dim=1)
+    v_diff_y = torch.diff(v_ic_pred.reshape(-1, int(np.sqrt(len(v_ic)))), dim=0)
+    
+    # Compute smoothness penalty
+    smoothness_penalty = (torch.mean(u_diff_x**2) + torch.mean(u_diff_y**2) +
+                         torch.mean(v_diff_x**2) + torch.mean(v_diff_y**2))
+    
+    # 3. Combine losses with weighting
+    total_ic_loss = (mse_u + mse_v) + weight_decay * smoothness_penalty
+    
+    return total_ic_loss
+
+def initialize_ic_weights(model, x_ic, u_ic, v_ic, num_iterations=1000):
+    """
+    Pre-train the network weights to better match initial conditions
+    before starting the full PINN training.
+    """
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    
+    for i in range(num_iterations):
+        optimizer.zero_grad()
+        loss = IC_loss(model, x_ic, u_ic, v_ic)
+        loss.backward()
+        optimizer.step()
+        
+        if i % 10 == 0:
+            print(f"IC pre-training iteration {i}, Loss: {loss.item():.6f}")
+    
+    return model
+
+def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
+    '''
+    Modified loss function with IC pre-training
+    '''
+    start_time = time.time()
+    
+    # First, pre-train on initial conditions
+    print("Pre-training on initial conditions...")
+    model = initialize_ic_weights(model, x_ic, u_ic, v_ic)
+    
+    # Choose Adams optimizer w/ set learning rate
+    optimizer = torch.optim.Adam(model.parameters(), lr=3e-2)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=100, verbose=True)
+        
+    x_ic_tensor = x_ic.clone().detach()
+    x_res_tensor = x_res.clone().detach()
+    
+    for epoch in range(epoch_max):
+        optimizer.zero_grad()
+
+        loss_ic = IC_loss(model, x_ic_tensor, u_ic, v_ic)
+        loss_residual = residual_loss(model, x_res_tensor)
+        loss_PDE = PDE_loss(model, N_analytical, times)
+        loss_bc = BC_loss(model, N_bc, times)
+
+        loss_tot = loss_ic + loss_residual + loss_PDE + loss_bc
+        
+        loss_tot.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        optimizer.step()
+        scheduler.step(loss_tot)
+
+        if epoch % 10 == 0:
+            print(f"Epoch {epoch}, Loss IC: {loss_ic.item()}, Loss BC: {loss_bc.item()}, "
+                  f"Loss Residual: {loss_residual.item()}, Loss PDE: {loss_PDE.item()}")
+
+        if loss_tot < tolerance:
+            break
+
+    end_time = time.time()
+    print(f"Total time is now: {end_time - start_time} seconds")
+    return model
 
 # The second of our PINN's 3 loss functions, based on the MSE from the residuals.
 def residual_loss(model, x_res_tensor):
@@ -398,6 +483,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
     '''
     start_time = time.time()
     # Choose Adams optimizer w/ set learning rate
+    model = initialize_ic_weights(model, x_ic, u_ic, v_ic)
     optimizer = torch.optim.Adam(model.parameters(), lr=3e-2)
     #Decay steps as time progresses for the PDE.
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=100, verbose=True)
@@ -408,7 +494,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
     for epoch in range(epoch_max):
         optimizer.zero_grad()
 
-        loss_ic = IC_loss(model, x_ic_tensor)
+        loss_ic = IC_loss(model, x_ic_tensor, u_ic, v_ic)
         loss_residual = residual_loss(model, x_res_tensor)
         loss_PDE = PDE_loss(model, N_analytical, times)
         loss_bc = BC_loss(model, N_bc, times)

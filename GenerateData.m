@@ -23,7 +23,7 @@ convolution_factor = 5;
 % numerical and stimulation parameters
 dt = 0.25;
 endtime = 500;
-dt_python = 25; % The time increment between lines printed to TimeVH.txt (same value as dt in ep_pinn_final.py)
+dt_python = 5; % The time increment between lines printed to TimeVH.txt (same value as dt in ep_pinn_final.py)
 nsteps = ceil(endtime/dt);
 stimdur= 2;
 nstimdur = ceil(stimdur/dt);
