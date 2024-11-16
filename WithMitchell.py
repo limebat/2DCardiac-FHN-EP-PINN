@@ -22,9 +22,9 @@ begin_time = 250        # -
 end_time = 400          # -
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
-NeuronCount = [3, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
-N_ic, N_res, N_analytical, N_bc = 6**2, 7**2, 5**2, 7**2  # Number of initial conditions, residual points, and analytical points
-epoch_max = int(100)  # Number of epochs
+NeuronCount = [3, 32, 32, 32, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
+N_ic, N_res, N_analytical, N_bc = 6, 7, 5, 7  # Number of initial conditions, residual points, and analytical points
+epoch_max = int(1000)  # Number of epochs
 
 times = torch.arange(begin_time, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
 print(times)
@@ -80,13 +80,11 @@ def load_initial_conditions(input_time):
     u_flattened = data[index, 1:total_points+1]
     v_flattened = data[index, total_points+1:]
     
-    u_initial = torch.tensor(u_flattened, dtype=torch.float32).flatten()
-    v_initial = torch.tensor(v_flattened, dtype=torch.float32).flatten()
-    
+    u_initial = torch.tensor(u_flattened, dtype=torch.float16).flatten()
+    v_initial = torch.tensor(v_flattened, dtype=torch.float16).flatten()
     
     u_ic_2D = u_initial.view(nx, ny)
     v_ic_2D = v_initial.view(nx, ny)
-    
     
     downsampled_x_indices = np.linspace(0, nx - 1, N_ic, dtype=int)
     downsampled_y_indices = np.linspace(0, ny - 1, N_ic, dtype=int)
@@ -243,11 +241,12 @@ def analytical_solution(input, input_time):
     u_reshaped = u_flattened.reshape(nx, ny)
     v_reshaped = v_flattened.reshape(nx, ny)
     
-    u_analytical = torch.tensor(u_reshaped, dtype=torch.float32).flatten()
-    v_analytical = torch.tensor(v_reshaped, dtype=torch.float32).flatten()
+    u_analytical = torch.tensor(u_reshaped, dtype=torch.float16).flatten()
+    v_analytical = torch.tensor(v_reshaped, dtype=torch.float16).flatten()
     
     sampled_u = u_analytical[:len(input)]
     sampled_v = v_analytical[:len(input)]
+    
     
     return sampled_u, sampled_v
 
@@ -275,7 +274,7 @@ def BC_loss(model, N_bc, times):
     # Generate inputs for model and analytical solution for all time steps
     sampled_xy_time = []
     for i, input_time in enumerate(times):
-        time_column = input_time * torch.ones((num_points, 1), dtype=torch.float32)
+        time_column = input_time * torch.ones((num_points, 1), dtype=torch.float16)
         sampled_xy_time.append(torch.cat([sampled_xy.float(), time_column], dim=1))
         
         # Get analytical solution at boundary for this time step
@@ -288,6 +287,7 @@ def BC_loss(model, N_bc, times):
     
     # Compute model predictions
     u_pred_bc, v_pred_bc = model(sampled_xy_time)
+    
     
     # Reshape predictions to match analytical data dimensions
     u_pred_bc = u_pred_bc.view(num_points, len(times))
