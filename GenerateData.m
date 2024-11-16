@@ -6,7 +6,7 @@ clf
 % from 2003 Bulletin of Mathematical Biology
 
 % parameter values 
-tau_in=0.3;
+tau_in=0.3 ; %0.3;
 tau_out=6;
 % original value; decreasing tau_open promotes breakup
 tau_open=120;
@@ -14,7 +14,7 @@ tau_open=120;
 %tau_close = 200;
 % original value; increasing tau_close cauess breakup a little earlier
 tau_close=150;
-v_gate=0.13; %0.13 %0.35 gives oscillatory
+v_gate=0.13; % 0.13; %0.13 %0.35 gives oscillatory
 
 v_stim=0.056; %twice diastolic threshold for 2ms duration
 
@@ -30,7 +30,7 @@ spiraltime=250;
 nspiraltime=ceil(spiraltime/dt);
 dx=0.05*convolution_factor; %*5^(1/2)
 diff=0.001; % diffusion coefficient
-nx=250/convolution_factor;
+nx=250 / convolution_factor ;
 ny=nx;
 dt_o_dx2=dt/(dx*dx);
 %paceevery=270;
@@ -55,7 +55,7 @@ fprintf(fileIDMESH, 'X, Y\n');
 %fprintf(fileID, '\n'); % Move to the next line
 
 %Begin recording time and their iterations
-record_iterations_begin = 249;
+record_iterations_begin = 450-2;
 t = 0:dt:endtime;
 xx=1:nx;
 xx=xx*dx;
@@ -120,7 +120,7 @@ for ntime=1:nsteps
 %    v = v + dt*dv + diff*dt_o_dx2*xlap;
     v = v + dt*dv + xlap;
     h = h + dt*dh;
-    if mod(ntime*dt, 25) == 0 && ntime*dt > record_iterations_begin
+    if mod(ntime*dt, 2) == 0 && ntime*dt > record_iterations_begin
         pcolor(v),shading interp,daspect([1 1 1]),caxis([0 1]),colorbar,title(["time = " num2str(ntime*dt)]),drawnow
 
         % Save state variables

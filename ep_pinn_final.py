@@ -15,15 +15,15 @@ beta = 0.5      # -
 gamma = 1       # -
 delta = 0.0     # -
 eps = 0.01      # -
-conv_factor = 2.5
+conv_factor = 5
 dx = 0.05 * conv_factor         # -
-dt = 1.0        # -
-begin_time = 550
-end_time = 555
+dt = 10.0        # -
+begin_time = 450
+end_time = 500
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
 NeuronCount = [3, 30, 30, 30, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
-N_ic, N_res, N_analytical, N_bc = 4**2, 4**2, 2**2, 4**2  # Number of initial conditions, residual points, and analytical points
+N_ic, N_res, N_analytical, N_bc = 7**2, 7**2, 4**2, 3**2  # Number of initial conditions, residual points, and analytical points
 epoch_max = int(20e2)  # Number of epochs
 
 times = torch.arange(begin_time, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
@@ -355,7 +355,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
         loss_bc = BC_loss(model, N_bc, times)
 
         #loss_ic + 
-        loss_tot = * loss_ic + loss_residual + * loss_PDE + loss_bc#loss_residual #+ loss_PDE + loss_bc
+        loss_tot = loss_residual + loss_PDE + loss_bc#loss_residual #+ loss_PDE + loss_bc
         
         #Backwards pass the total loss
         loss_tot.backward()
@@ -367,7 +367,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
         scheduler.step(loss_tot)
 
         # Keep track of our losses at periodic intervals.
-        if epoch % 50 == 0:
+        if epoch % 10 == 0:
             print(f"Epoch {epoch}, Loss IC: {loss_ic.item()}, Loss BC: {loss_bc.item()}, Loss Residual: {loss_residual.item()}, Loss PDE: {loss_PDE.item()}") #Loss IC: {loss_ic.item()}, 
 
         if loss_tot < tolerance:
