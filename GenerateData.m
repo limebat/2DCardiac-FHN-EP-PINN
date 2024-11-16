@@ -23,14 +23,15 @@ convolution_factor = 2.5;
 % numerical and stimulation parameters
 dt = 0.25;
 endtime = 505;
+dt_python = 25; % The time increment between lines printed to TimeVH.txt (same value as dt in ep_pinn_final.py)
 nsteps = ceil(endtime/dt);
 stimdur= 2;
 nstimdur = ceil(stimdur/dt);
 spiraltime=250;
 nspiraltime=ceil(spiraltime/dt);
-dx=0.05*convolution_factor; %*5^(1/2)
+dx=0.05*convolution_factor; % *5
 diff=0.001; % diffusion coefficient
-nx=250 / convolution_factor ;
+nx=spiraltime/convolution_factor;
 ny=nx;
 dt_o_dx2=dt/(dx*dx);
 %paceevery=270;
@@ -56,6 +57,7 @@ fprintf(fileIDMESH, 'X, Y\n');
 
 %Begin recording time and their iterations
 record_iterations_begin = 500-dt;
+record_iterations_begin = spiraltime-dt_python;
 t = 0:dt:endtime;
 xx=1:nx;
 xx=xx*dx;
@@ -121,6 +123,7 @@ for ntime=1:nsteps
     v = v + dt*dv + xlap;
     h = h + dt*dh;
     if mod(ntime*dt, dt) == 0 && ntime*dt > record_iterations_begin
+    if mod(ntime*dt, dt_python) == 0 && ntime*dt > record_iterations_begin
         pcolor(v),shading interp,daspect([1 1 1]),caxis([0 1]),colorbar,title(["time = " num2str(ntime*dt)]),drawnow
 
         % Save state variables
@@ -156,5 +159,3 @@ disp('Data saved to TimeVH.txt');
 %pcolor(xx,xx,squeeze(vsave(2,:,:))),shading interp,colorbar
 %subplot(2,1,2)
 %pcolor(t,xx,hsave'),shading interp,xlabel('Time'),ylabel('Space'), colorbar
-
-

@@ -10,6 +10,7 @@ import time
 import pandas as pd
 
 # Constants and other initializations
+<<<<<<< HEAD
 a = 0.1         # The model parameters for FHN
 beta = 0.5      # -
 gamma = 1       # -
@@ -24,12 +25,33 @@ D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
 NeuronCount = [3, 20, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
 N_ic, N_res, N_analytical, N_bc = 5**2, 7**2, 5**2, 3**2  # Number of initial conditions, residual points, and analytical points
+=======
+a = 0.1                 # The model parameters for FHN
+beta = 0.5              # -
+gamma = 1               # -
+delta = 0.0             # -
+eps = 0.01              # -
+conv_factor = 5         # -
+dx = 0.05 * conv_factor # -
+dt = 25.0               # -
+begin_time = 250        # -
+end_time = 500          # -
+D_u = 1e-3      # Our diffusion coefficient for u
+nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
+NeuronCount = [3, 30, 30, 30, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
+N_ic, N_res, N_analytical, N_bc = 7**2, 7**2, 4**2, 3**2  # Number of initial conditions, residual points, and analytical points
+>>>>>>> 27eafd08557616e133d8fa3140620d02fd176764
 epoch_max = int(50)  # Number of epochs
 
 times = torch.arange(begin_time, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
 print(times)
 
 x_end = y_end = nx * dx
+
+# Make the code run on cpu if cuda is not available and gpu if it is.
+print(f"Is CUDA supported by this system? {torch.cuda.is_available()}")
+print(f"CUDA version: {torch.version.cuda}")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Function to return initial x / y / t values separately for ICs and residuals so they don't have to be the same. Create grid over x, y with t=0.
 def return_x_tensor(N, is_IC, input_time):
@@ -134,7 +156,8 @@ def residual(model, input):
     input_combined = torch.cat([x_tensor, y_tensor, t_tensor], dim=1)
     
     # Get model predictions - DO NOT detach these
-    u_pred, v_pred = model(input_combined)
+    u_pred, v_pred = model(input_combined.to(device))
+    u_pred, v_pred =u_pred.cpu(), v_pred.cpu()
     
     # Create gradient outputs of appropriate size
     grad_outputs = torch.ones_like(u_pred)
@@ -236,6 +259,7 @@ def BC_loss(model, N_bc, times):
     x_boundary = torch.linspace(0, nx - 1, N_bc, dtype=int)
     y_boundary = torch.linspace(0, ny - 1, N_bc, dtype=int)
     
+<<<<<<< HEAD
     # Define the walls at the boundaries of the analytical solution, N_bc long
     top_wall = torch.stack([x_boundary, torch.zeros(N_bc, dtype=int)], dim=1)
     bottom_wall = torch.stack([x_boundary, (ny - 1) * torch.ones(N_bc, dtype=int)], dim=1)
@@ -255,6 +279,31 @@ def BC_loss(model, N_bc, times):
     for i, input_time in enumerate(times):
         time_column = input_time * torch.ones((num_points, 1), dtype=torch.float32)
         sampled_xy_time.append(torch.cat([sampled_xy.float(), time_column], dim=1))
+=======
+    for input_time in times:
+        # Sample top, bottom, left, right
+        x_boundary = torch.linspace(0, nx - 1, N_bc, dtype=int)
+        y_boundary = torch.linspace(0, ny - 1, N_bc, dtype=int)
+        
+        # Define the walls at the boundaries of the analytical solution, N_bc long
+        top_wall = torch.stack([x_boundary, torch.zeros(N_bc, dtype=int)], dim=1)
+        bottom_wall = torch.stack([x_boundary, (ny - 1) * torch.ones(N_bc, dtype=int)], dim=1)
+        left_wall = torch.stack([torch.zeros(N_bc, dtype=int), y_boundary], dim=1)
+        right_wall = torch.stack([(nx - 1) * torch.ones(N_bc, dtype=int), y_boundary], dim=1)
+        
+        # Combine all walls into a single tensor, which will be read for the combined time-tensor as well.
+        sampled_xy = torch.cat([top_wall, bottom_wall, left_wall, right_wall], dim=0)
+        time_tensor = input_time * torch.ones(sampled_xy.size(0), 1)
+        sampled_xy = torch.cat([sampled_xy, time_tensor], dim=1)
+        
+        # Now see what the model will predict for the given samples in xy, at time t. 
+        u_bc_pred, v_bc_pred = model(sampled_xy.to(device))
+        u_bc_pred, v_bc_pred =u_bc_pred.detach().cpu(), v_bc_pred.detach().cpu()
+        u_analytical, v_analytical = analytical_solution(sampled_xy, input_time)
+
+        # MSE error
+        loss_bc = torch.mean((u_bc_pred - u_analytical) ** 2 + (v_bc_pred - v_analytical) ** 2)   
+>>>>>>> 27eafd08557616e133d8fa3140620d02fd176764
         
         # Get analytical solution at boundary for this time step
         u_slice, v_slice = analytical_solution(sampled_xy, input_time)
@@ -285,7 +334,8 @@ def IC_loss(model, x_ic_tensor):
         model - The PINN model
         x_ic_tensor - the initial conditions; this should be a (size of x_vals) x (size of y_vals) x (size of t=0s) tensor; see top of file
     '''
-    u_ic_pred, v_ic_pred = model(x_ic_tensor)  # Predicted output of model at this x_ic_tensor.
+    u_ic_pred, v_ic_pred = model(x_ic_tensor.to(device))  # Predicted output of model at this x_ic_tensor.
+    u_ic_pred, v_ic_pred =u_ic_pred.detach().cpu(), v_ic_pred.detach().cpu()
 
     # MSE Losses
     loss_ic = torch.sqrt(torch.mean((u_ic_pred - u_ic) ** 2 + (v_ic_pred - v_ic) ** 2))  # Compute loss
@@ -391,8 +441,13 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
         loss_PDE = PDE_loss(model, N_analytical, times)
         loss_bc = BC_loss(model, N_bc, times)
 
+<<<<<<< HEAD
         #loss_ic + 
         loss_tot = loss_ic + loss_residual + loss_PDE + loss_bc #  + loss_bc#loss_residual #+ loss_PDE + loss_bc
+=======
+        #The total loss function
+        loss_tot = loss_residual + loss_PDE + loss_bc + loss_ic
+>>>>>>> 27eafd08557616e133d8fa3140620d02fd176764
         
         #Backwards pass the total loss
         loss_tot.backward()
@@ -429,8 +484,9 @@ def plot_transient_2d(model, times, N_res, x_ic, x_res, N_analytical, epoch_max)
         # Prepare input grid with current time for the model prediction
         xy = torch.stack([x_mesh.flatten(), y_mesh.flatten(), time * torch.ones_like(x_mesh.flatten())], dim=1)
        
-        u_pred, v_pred = model(xy)
-        u_pred = u_pred.detach().numpy().reshape(nx, ny)
+        u_pred, v_pred = model(xy.to(device))
+        u_pred = u_pred.detach().cpu().numpy().reshape(nx, ny)
+        v_pred = v_pred.detach().cpu().numpy().reshape(nx, ny)
         
         # Get analytical solution for u at the given time
         u_analytical, v_analytical = analytical_solution(xy, time)
@@ -475,9 +531,9 @@ def plot_residuals(model, times, N_res, x_ic, x_res, N_analytical, epoch_max):
         xy = torch.stack([x_mesh.flatten(), y_mesh.flatten(), time * torch.ones_like(x_mesh.flatten())], dim=1)
         print('Input is of dimensions: ', np.size(xy), 'Value of : ', xy)
        
-        u_pred, v_pred = model(xy)
-        u_pred = u_pred.detach().numpy().reshape(nx, ny)
-        v_pred = v_pred.detach().numpy().reshape(nx, ny)
+        u_pred, v_pred = model(xy.to(device))
+        u_pred = u_pred.detach().cpu().numpy().reshape(nx, ny)
+        v_pred = v_pred.detach().cpu().numpy().reshape(nx, ny)
         
         # Get analytical solution for u at the given time
         u_analytical, v_analytical = analytical_solution(xy, time)
@@ -511,5 +567,6 @@ def plot_residuals(model, times, N_res, x_ic, x_res, N_analytical, epoch_max):
 
 # Our main code block
 model = PINN(NeuronCount)
+model = model.to(device)
 plot_transient_2d(model, times, N_res, x_ic, x_res, N_analytical, epoch_max)
 # plot_residuals(model, times, N_res, x_ic, x_res, N_analytical, epoch_max, times)
