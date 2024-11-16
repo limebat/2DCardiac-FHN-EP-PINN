@@ -10,7 +10,6 @@ import time
 import pandas as pd
 
 # Constants and other initializations
-<<<<<<< HEAD
 a = 0.1         # The model parameters for FHN
 beta = 0.5      # -
 gamma = 1       # -
@@ -25,22 +24,6 @@ D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
 NeuronCount = [3, 20, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
 N_ic, N_res, N_analytical, N_bc = 5**2, 7**2, 5**2, 3**2  # Number of initial conditions, residual points, and analytical points
-=======
-a = 0.1                 # The model parameters for FHN
-beta = 0.5              # -
-gamma = 1               # -
-delta = 0.0             # -
-eps = 0.01              # -
-conv_factor = 5         # -
-dx = 0.05 * conv_factor # -
-dt = 25.0               # -
-begin_time = 250        # -
-end_time = 500          # -
-D_u = 1e-3      # Our diffusion coefficient for u
-nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
-NeuronCount = [3, 30, 30, 30, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
-N_ic, N_res, N_analytical, N_bc = 7**2, 7**2, 4**2, 3**2  # Number of initial conditions, residual points, and analytical points
->>>>>>> 27eafd08557616e133d8fa3140620d02fd176764
 epoch_max = int(50)  # Number of epochs
 
 times = torch.arange(begin_time, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
@@ -259,7 +242,6 @@ def BC_loss(model, N_bc, times):
     x_boundary = torch.linspace(0, nx - 1, N_bc, dtype=int)
     y_boundary = torch.linspace(0, ny - 1, N_bc, dtype=int)
     
-<<<<<<< HEAD
     # Define the walls at the boundaries of the analytical solution, N_bc long
     top_wall = torch.stack([x_boundary, torch.zeros(N_bc, dtype=int)], dim=1)
     bottom_wall = torch.stack([x_boundary, (ny - 1) * torch.ones(N_bc, dtype=int)], dim=1)
@@ -279,31 +261,6 @@ def BC_loss(model, N_bc, times):
     for i, input_time in enumerate(times):
         time_column = input_time * torch.ones((num_points, 1), dtype=torch.float32)
         sampled_xy_time.append(torch.cat([sampled_xy.float(), time_column], dim=1))
-=======
-    for input_time in times:
-        # Sample top, bottom, left, right
-        x_boundary = torch.linspace(0, nx - 1, N_bc, dtype=int)
-        y_boundary = torch.linspace(0, ny - 1, N_bc, dtype=int)
-        
-        # Define the walls at the boundaries of the analytical solution, N_bc long
-        top_wall = torch.stack([x_boundary, torch.zeros(N_bc, dtype=int)], dim=1)
-        bottom_wall = torch.stack([x_boundary, (ny - 1) * torch.ones(N_bc, dtype=int)], dim=1)
-        left_wall = torch.stack([torch.zeros(N_bc, dtype=int), y_boundary], dim=1)
-        right_wall = torch.stack([(nx - 1) * torch.ones(N_bc, dtype=int), y_boundary], dim=1)
-        
-        # Combine all walls into a single tensor, which will be read for the combined time-tensor as well.
-        sampled_xy = torch.cat([top_wall, bottom_wall, left_wall, right_wall], dim=0)
-        time_tensor = input_time * torch.ones(sampled_xy.size(0), 1)
-        sampled_xy = torch.cat([sampled_xy, time_tensor], dim=1)
-        
-        # Now see what the model will predict for the given samples in xy, at time t. 
-        u_bc_pred, v_bc_pred = model(sampled_xy.to(device))
-        u_bc_pred, v_bc_pred =u_bc_pred.detach().cpu(), v_bc_pred.detach().cpu()
-        u_analytical, v_analytical = analytical_solution(sampled_xy, input_time)
-
-        # MSE error
-        loss_bc = torch.mean((u_bc_pred - u_analytical) ** 2 + (v_bc_pred - v_analytical) ** 2)   
->>>>>>> 27eafd08557616e133d8fa3140620d02fd176764
         
         # Get analytical solution at boundary for this time step
         u_slice, v_slice = analytical_solution(sampled_xy, input_time)
@@ -441,13 +398,8 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
         loss_PDE = PDE_loss(model, N_analytical, times)
         loss_bc = BC_loss(model, N_bc, times)
 
-<<<<<<< HEAD
         #loss_ic + 
         loss_tot = loss_ic + loss_residual + loss_PDE + loss_bc #  + loss_bc#loss_residual #+ loss_PDE + loss_bc
-=======
-        #The total loss function
-        loss_tot = loss_residual + loss_PDE + loss_bc + loss_ic
->>>>>>> 27eafd08557616e133d8fa3140620d02fd176764
         
         #Backwards pass the total loss
         loss_tot.backward()
