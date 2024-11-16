@@ -10,16 +10,16 @@ import time
 import pandas as pd
 
 # Constants and other initializations
-a = 0.1         # The model parameters for FHN
-beta = 0.5      # -
-gamma = 1       # -
-delta = 0.0     # -
-eps = 0.01      # -
-conv_factor = 5
-dx = 0.05 * conv_factor         # -
-dt = 25        # -
-begin_time = 250
-end_time = 400
+a = 0.1                 # The model parameters for FHN
+beta = 0.5              # -
+gamma = 1               # -
+delta = 0.0             # -
+eps = 0.01              # -
+conv_factor = 5         # -
+dx = 0.05 * conv_factor # -
+dt = 25                 # -
+begin_time = 250        # -
+end_time = 400          # -
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
 NeuronCount = [3, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
@@ -31,10 +31,11 @@ print(times)
 
 x_end = y_end = nx * dx
 
+# TODO Cuda not working in this file, so disabled for the moment.
 # Make the code run on cpu if cuda is not available and gpu if it is.
 print(f"Is CUDA supported by this system? {torch.cuda.is_available()}")
 print(f"CUDA version: {torch.version.cuda}")
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")    #"cuda" if torch.cuda.is_available() else 
 
 # Function to return initial x / y / t values separately for ICs and residuals so they don't have to be the same. Create grid over x, y with t=0.
 def return_x_tensor(N, is_IC, input_time):

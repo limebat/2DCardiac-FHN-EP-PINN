@@ -10,16 +10,16 @@ import time
 import pandas as pd
 
 # Constants and other initializations
-a = 0.1         # The model parameters for FHN
-beta = 0.5      # -
-gamma = 1       # -
-delta = 0.0     # -
-eps = 0.01      # -
-conv_factor = 5
-dx = 0.05 * conv_factor         # -
-dt = 25        # -
-begin_time = 250
-end_time = 400
+a = 0.1                 # The model parameters for FHN
+beta = 0.5              # -
+gamma = 1               # -
+delta = 0.0             # -
+eps = 0.01              # -
+conv_factor = 5         # -
+dx = 0.05 * conv_factor # -
+dt = 25                 # -
+begin_time = 250        # -
+end_time = 400          # -
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
 NeuronCount = [3, 20, 20, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
