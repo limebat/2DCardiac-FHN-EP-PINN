@@ -383,7 +383,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
     '''
     start_time = time.time()
     # Choose Adams optimizer w/ set learning rate
-    optimizer = torch.optim.Adam(model.parameters(), lr=3e-2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-1)
     #Decay steps as time progresses for the PDE.
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=100, verbose=True)
         
