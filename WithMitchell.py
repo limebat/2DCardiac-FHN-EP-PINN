@@ -17,14 +17,15 @@ delta = 0.0             # -
 eps = 0.01              # -
 conv_factor = 5         # -
 dx = 0.05 * conv_factor # -
-dt = 10                 # -
+dt = 50                 # -
 begin_time = 250        # -
-end_time = 300          # -
+end_time = 500 #500          # -
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
-NeuronCount = [3, 8, 8, 8, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
-N_ic, N_res, N_analytical, N_bc = 4, 5, 3, 3  # Number of initial conditions, residual points, and analytical points
-epoch_max = int(100)  # Number of epochs
+NeuronCount = [3, 16, 32, 16, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
+#Note : The below points are wrt to each axis, so if choosing 5 points, then it's actually 25 pts being sampled
+N_ic, N_res, N_analytical, N_bc = 5, 6, 4, 3  # Number of sqrt pts initial conditions, residual points, and analytical points
+epoch_max = int(300)  # Number of epochs
 
 times = torch.arange(begin_time, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
 print(times)
@@ -112,15 +113,24 @@ class PINN(nn.Module):
     def __init__(self, NeuronCount):
         super(PINN, self).__init__()
         self.layers = nn.ModuleList()
+        self.batch_norms = nn.ModuleList()
         for i in range(len(NeuronCount) - 1):
-            self.layers.append(nn.Linear(NeuronCount[i], NeuronCount[i + 1]))
+            layer = nn.Linear(NeuronCount[i], NeuronCount[i + 1])
+            nn.init.xavier_normal_(layer.weight)
+            self.layers.append(layer)
+            
+            # Add batch norm for all but the last layer
+            if i < len(NeuronCount) - 2:
+                self.batch_norms.append(nn.BatchNorm1d(NeuronCount[i + 1]))
 
     # Neural network forward pass method. Use tanh activation function for hidden layers.
     # Params:
     #   x - Input tensor; iteratively passed through each network layer
     def forward(self, x):
         for i in range(len(self.layers) - 1):
-            x = torch.tanh(self.layers[i](x))  # TANH HIDDEN LAYERS
+            x = self.layers[i](x)
+            x = self.batch_norms[i](x)
+            x = torch.tanh(x)  # Using tanh for better gradient flow
         x = self.layers[-1](x)  # FINAL LAYER, NO ACTIVATION
         u = x[:, 0]
         v = x[:, 1]
@@ -414,7 +424,7 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
         loss_bc = BC_loss(model, N_bc, times)
 
         #loss_ic + 
-        loss_tot = loss_ic + loss_residual + loss_PDE + loss_bc #  + loss_bc#loss_residual #+ loss_PDE + loss_bc
+        loss_tot = 1/3 * loss_ic + loss_residual + 1/10 * loss_PDE + 1/5 * loss_bc #  + loss_bc#loss_residual #+ loss_PDE + loss_bc
         
         #Backwards pass the total loss
         loss_tot.backward()
