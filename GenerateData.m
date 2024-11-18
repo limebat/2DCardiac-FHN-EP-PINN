@@ -18,11 +18,11 @@ v_gate=0.13; % 0.13; %0.13 %0.35 gives oscillatory
 
 v_stim=0.056; %twice diastolic threshold for 2ms duration
 
-convolution_factor = 5;
+convolution_factor = 1;
 
 % numerical and stimulation parameters
-dt = 0.25;
-endtime = 500;
+dt = 0.1;
+endtime = 260;
 dt_python = 5; % The time increment between lines printed to TimeVH.txt (same value as dt in ep_pinn_final.py)
 nsteps = ceil(endtime/dt);
 stimdur= 2;

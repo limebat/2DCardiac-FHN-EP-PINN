@@ -15,17 +15,17 @@ beta = 0.5              # -
 gamma = 1               # -
 delta = 0.0             # -
 eps = 0.01              # -
-conv_factor = 5         # -
+conv_factor = 1.0         # -
 dx = 0.05 * conv_factor # -
-dt = 50                 # -
+dt = 10                 # -
 begin_time = 250        # -
-end_time = 500 #500          # -
+end_time = 250 #500          # -
 D_u = 1e-3      # Our diffusion coefficient for u
 nx = ny = int(250 // conv_factor)   # Number of spatial points in x and y directions
-NeuronCount = [3, 16, 32, 16, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
+NeuronCount = [3, 32, 32, 32, 2]  # Input dimension is 3 (x, y, t); output is 2 (u, v)
 #Note : The below points are wrt to each axis, so if choosing 5 points, then it's actually 25 pts being sampled
-N_ic, N_res, N_analytical, N_bc = 5, 6, 4, 3  # Number of sqrt pts initial conditions, residual points, and analytical points
-epoch_max = int(300)  # Number of epochs
+N_ic, N_res, N_analytical, N_bc = 18, 27, 9, 9  # Number of sqrt pts initial conditions, residual points, and analytical points
+epoch_max = int(500)  # Number of epochs
 
 times = torch.arange(begin_time, end_time+dt, dt)  # List of discrete evaluation times starting at 0 with spacing dt
 print(times)
@@ -245,8 +245,8 @@ def analytical_solution(input, input_time):
         raise ValueError(f"Specified time {input_time} not found in the data file.")
     
     index = time_index
-    u_flattened = data[index, 1:total_points+1].flatten() # The first half of data contains u values -- +1 to skip time-index at first element
-    v_flattened = data[index, total_points+1:].flatten()  # And the second half contains v values
+    u_flattened = data[index, 1:total_points+1] # The first half of data contains u values -- +1 to skip time-index at first element
+    v_flattened = data[index, total_points+1:]  # And the second half contains v values
     
     u_reshaped = u_flattened.reshape(nx, ny)
     v_reshaped = v_flattened.reshape(nx, ny)
@@ -256,6 +256,7 @@ def analytical_solution(input, input_time):
     
     sampled_u = u_analytical[:len(input)]
     sampled_v = v_analytical[:len(input)]
+    
     
     
     return sampled_u, sampled_v
@@ -324,8 +325,8 @@ def IC_loss(model, x_ic_tensor):
     return loss_ic
 
 # The second of our PINN's 3 loss functions, based on the MSE from the residuals.
-def residual_loss(model, x_res_tensor):
-    residual_value_u, residual_value_v = residual(model, x_res_tensor)
+def residual_loss(model, res_tensor):
+    residual_value_u, residual_value_v = residual(model, res_tensor)
     loss_residual_u = torch.mean(residual_value_u ** 2)
     loss_residual_v = torch.mean(residual_value_v ** 2)
     return torch.sqrt(loss_residual_u + loss_residual_v)
@@ -413,18 +414,18 @@ def loss(model, x_ic, x_res, N_analytical, epoch_max, times, tolerance=1e-2):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=100, verbose=True)
         
     x_ic_tensor = x_ic.clone().detach()  # Reuse x_ic
-    x_res_tensor = x_res.clone().detach()  # Reuse x_res
+    res_tensor = x_res.clone().detach()  # Reuse x_res
     
     for epoch in range(epoch_max):
         optimizer.zero_grad()
 
         loss_ic = IC_loss(model, x_ic_tensor)
-        loss_residual = residual_loss(model, x_res_tensor)
+        loss_residual = residual_loss(model, res_tensor)
         loss_PDE = PDE_loss(model, N_analytical, times)
         loss_bc = BC_loss(model, N_bc, times)
 
         #loss_ic + 
-        loss_tot = 1/3 * loss_ic + loss_residual + 1/10 * loss_PDE + 1/5 * loss_bc #  + loss_bc#loss_residual #+ loss_PDE + loss_bc
+        loss_tot = 3 * loss_ic + 1.3 * loss_residual + 1.3 * loss_PDE + loss_bc #  + loss_bc#loss_residual #+ loss_PDE + loss_bc
         
         #Backwards pass the total loss
         loss_tot.backward()
