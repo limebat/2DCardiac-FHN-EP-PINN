@@ -18,12 +18,12 @@ v_gate=0.13; % 0.13; %0.13 %0.35 gives oscillatory
 
 v_stim=0.056; %twice diastolic threshold for 2ms duration
 
-convolution_factor = 1;
+convolution_factor = 5;
 
 % numerical and stimulation parameters
-dt = 0.1;
-endtime = 260;
-dt_python = 5; % The time increment between lines printed to TimeVH.txt (same value as dt in ep_pinn_final.py)
+dt = 0.05;
+endtime = 850;
+dt_python = 100; % The time increment between lines printed to TimeVH.txt (same value as dt in ep_pinn_final.py)
 nsteps = ceil(endtime/dt);
 stimdur= 2;
 nstimdur = ceil(stimdur/dt);
@@ -126,16 +126,22 @@ for ntime=1:nsteps
 
         % Save state variables
         
-        % Flatten and save to file
-        v_flatten = v(:)';
-        h_flatten = h(:)';
+        % Flatten and save to file in row-major order
+        v_flatten = v'; % Transpose v to ensure row-major order
+        h_flatten = h'; % Transpose h to ensure row-major order
+        
+        % Convert to row-major order before flattening
+        v_flatten = v_flatten(:)';
+        h_flatten = h_flatten(:)';
         data_row = [ntime*dt, v_flatten, h_flatten];
+        
         % Print the data row without an extra comma at the end
         fprintf(fileID, '%g', data_row(1)); % Print the first value without a leading comma
         for j = 2:length(data_row)
             fprintf(fileID, ', %g', data_row(j)); % Print subsequent values with a leading comma
         end
         fprintf(fileID, '\n'); % Move to the next line
+
             
     end
 end
