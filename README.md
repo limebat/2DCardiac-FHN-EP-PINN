@@ -3,6 +3,9 @@ FHN EP-PINN model for cardiac ion modeling using simulated detailed data, ref. M
 
 To run, first run the .m file to generate simulated baseline data; TimeVH.txt will be the output file containing time and V-H data from Mitchell-Schaeffer. Afterward, run ep_pinn_final.py to train the PINN and get the results.
 
+[InitialProposal (8).pdf](https://github.com/user-attachments/files/17941878/InitialProposal.8.pdf)
+
+
 ![InitialProposal (8)_page-0001](https://github.com/user-attachments/assets/f586a290-5a62-4c82-bbeb-bce346c9f82f)
 ![InitialProposal (8)_page-0002](https://github.com/user-attachments/assets/e7b502f2-e0b9-4d8d-8fc5-b27aecc838d0)
 ![InitialProposal (8)_page-0003](https://github.com/user-attachments/assets/6f89fa45-fa6c-49d2-8873-7b434e8ff372)
